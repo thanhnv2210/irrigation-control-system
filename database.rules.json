@@ -82,6 +82,13 @@
         }
       },
 
+      // Audit log — any owner reads and writes
+      "auditLog": {
+        ".indexOn": ["timestamp"],
+        ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+        ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+      },
+
       // App settings (alert thresholds, Telegram config) — any owner reads/writes
       "settings": {
         ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",

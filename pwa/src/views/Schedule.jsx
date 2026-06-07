@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ref, set, remove, push } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
+import { logAudit } from '../utils/audit'
 
 const ZONES   = [{ id: 'balcony', label: 'Balcony' }, { id: 'garden', label: 'Garden' }]
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -21,16 +22,17 @@ function ScheduleForm({ zoneId, initial, onDone }) {
   async function save() {
     if (form.days.length === 0) return alert('Select at least one day')
     const zonesRef = ref(db, `irrigation/zones/${zoneId}/schedule`)
-    const entryRef = initial?._id
-      ? ref(db, `irrigation/zones/${zoneId}/schedule/${initial._id}`)
-      : push(zonesRef)
-    await set(entryRef, {
+    const isNew    = !initial?._id
+    const entryRef = isNew ? push(zonesRef) : ref(db, `irrigation/zones/${zoneId}/schedule/${initial._id}`)
+    const entry = {
       hour:            Number(form.hour),
       minute:          Number(form.minute),
       durationMinutes: Number(form.durationMinutes),
       enabled:         form.enabled,
       days:            form.days
-    })
+    }
+    await set(entryRef, entry)
+    logAudit('SCHEDULE_SAVED', zoneId, { ...entry, isNew })
     onDone()
   }
 
@@ -77,9 +79,11 @@ function ScheduleItem({ zoneId, id, entry, onEdit }) {
 
   async function toggle() {
     await set(ref(db, `irrigation/zones/${zoneId}/schedule/${id}/enabled`), !entry.enabled)
+    logAudit('SCHEDULE_TOGGLED', zoneId, { scheduleId: id, hour: entry.hour, minute: entry.minute, enabled: !entry.enabled })
   }
   async function del() {
     await remove(ref(db, `irrigation/zones/${zoneId}/schedule/${id}`))
+    logAudit('SCHEDULE_DELETED', zoneId, { scheduleId: id, hour: entry.hour, minute: entry.minute })
   }
 
   return (

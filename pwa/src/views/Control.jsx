@@ -3,6 +3,7 @@ import { ref, set, serverTimestamp } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { logAudit } from '../utils/audit'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -23,6 +24,7 @@ function ZoneControl({ zoneId, label }) {
       issuedAt: serverTimestamp(),
       issuedBy: 'app'
     })
+    logAudit('VALVE_COMMAND', zoneId, { action })
   }
 
   function handlePress(action) {

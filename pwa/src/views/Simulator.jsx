@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ref, set, push, get, update } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
+import { logAudit } from '../utils/audit'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -219,6 +220,7 @@ function ScheduleTrigger() {
       await set(ref(db, `irrigation/zones/${zoneId}/valve`), {
         state: 'OPEN', openedBy: 'schedule', lastChangedAt: Date.now()
       })
+      logAudit('SCHEDULE_FIRED', zoneId, { scheduleId, hour: entry.hour, minute: entry.minute, durationMinutes: entry.durationMinutes })
       addLog(`${label}: schedule fired "${entry.hour}:${String(entry.minute).padStart(2,'0')}" — valve OPEN for ${entry.durationMinutes} min`)
 
       setTimeout(async () => {
