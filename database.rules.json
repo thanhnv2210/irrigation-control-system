@@ -1,0 +1,74 @@
+{
+  "rules": {
+    // -----------------------------------------------------------------------
+    // Existing iot2025 data — owner only
+    // -----------------------------------------------------------------------
+    "iot2025": {
+      ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+      ".write": "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'"
+    },
+
+    // -----------------------------------------------------------------------
+    // Irrigation system
+    // -----------------------------------------------------------------------
+    "irrigation": {
+
+      // Device heartbeat — ESP32 writes only, owner reads
+      "devices": {
+        "$device_id": {
+          ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+          ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+        }
+      },
+
+      "zones": {
+        "$zone_id": {
+
+          // Zone metadata — owner reads and writes
+          "meta": {
+            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+            ".write": "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'"
+          },
+
+          // Sensor data — ESP32 writes, owner reads
+          "sensor": {
+            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+          },
+
+          // Valve state — ESP32 writes, owner reads
+          "valve": {
+            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+          },
+
+          // Command — owner writes (issues commands), ESP32 reads and clears
+          "command": {
+            ".read":  "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'",
+            ".write": "auth != null && (
+              auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
+              auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
+            )"
+          },
+
+          // Schedule — owner reads and writes, ESP32 reads
+          "schedule": {
+            ".read":  "auth != null && (
+              auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
+              auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
+            )",
+            ".write": "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'"
+          }
+        }
+      }
+    },
+
+    // -----------------------------------------------------------------------
+    // Deny everything else
+    // -----------------------------------------------------------------------
+    "$other": {
+      ".read":  false,
+      ".write": false
+    }
+  }
+}

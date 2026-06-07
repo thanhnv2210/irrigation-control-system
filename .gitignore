@@ -1,0 +1,18 @@
+# Credentials — never commit
+irrigation_main/config.h
+
+# Arduino build artifacts
+build/
+*.elf
+*.bin
+*.hex
+*.map
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Arduino IDE 2.x
+.arduino15/
