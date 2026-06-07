@@ -42,24 +42,33 @@ Windows-specific guide for flashing the ESP32 — USB driver installation and CO
 
 ```
 irrigation-control-system/
-├── irrigation_main/
-│   ├── irrigation_main.ino   — production firmware (M1 complete)
-│   ├── config.h              — credentials (gitignored, never commit)
-│   └── config.h.example      — template with placeholder values
-├── esp_32_auto_config_v1/    — WiFi provisioning sketch (reference)
-├── elb_peripheral_v1/        — TCP + Firebase prototype (reference)
-├── Firebase_Sample_2/        — FirebaseESP32 library sample (reference)
+├── firmware/
+│   ├── irrigation_main/
+│   │   ├── irrigation_main.ino   — production firmware (M1 complete)
+│   │   ├── config.h              — credentials (gitignored, never commit)
+│   │   └── config.h.example      — template with placeholder values
+│   ├── esp_32_auto_config_v1/    — WiFi provisioning sketch (reference)
+│   ├── elb_peripheral_v1/        — TCP + Firebase prototype (reference)
+│   └── Firebase_Sample_2/        — FirebaseESP32 library sample (reference)
+├── pwa/
+│   ├── src/
+│   │   ├── firebase.js           — Firebase init
+│   │   ├── hooks/useZoneData.js  — real-time Firebase hooks
+│   │   ├── views/                — Dashboard, Control, Schedule
+│   │   └── components/           — ConfirmDialog
+│   ├── package.json
+│   └── vite.config.js
+├── docs/
+│   ├── README.md             — this file
+│   ├── hardware-guide.md
+│   ├── firebase-setup.md
+│   ├── arduino-ide-setup.md
+│   └── flashing-windows.md
 ├── database.rules.json       — Firebase RTDB security rules
 ├── firebase.json             — Firebase CLI deploy config
 ├── TODO.md                   — milestone progress tracker
 ├── CLAUDE.md                 — project brief for Claude Code
-├── .gitignore
-└── docs/
-    ├── README.md             — this file
-    ├── hardware-guide.md
-    ├── firebase-setup.md
-    ├── arduino-ide-setup.md
-    └── flashing-windows.md
+└── .gitignore
 ```
 
 ---
@@ -70,6 +79,6 @@ irrigation-control-system/
 |---|---|
 | M1 — Firmware: Core Loop | Complete — pending hardware for physical verification |
 | M2 — Firmware: Schedules + Multi-zone | Not started |
-| M3 — React PWA: Dashboard + Manual Control | Not started |
-| M4 — React PWA: Schedule Editor | Not started |
+| M3 — React PWA: Dashboard + Manual Control | Complete — pending hardware for live data |
+| M4 — React PWA: Schedule Editor | Complete — pending hardware for live data |
 | M5 — Hardening | Security rules deployed — alerts and seasonal review pending |

@@ -1,5 +1,5 @@
 # Credentials — never commit
-irrigation_main/config.h
+firmware/irrigation_main/config.h
 
 # Arduino build artifacts
 build/
@@ -7,6 +7,10 @@ build/
 *.bin
 *.hex
 *.map
+
+# PWA
+pwa/node_modules/
+pwa/dist/
 
 # macOS
 .DS_Store
