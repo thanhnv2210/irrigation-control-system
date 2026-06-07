@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ref, onValue, set } from 'firebase/database'
 import { db } from '../firebase'
+import { useDeviceData } from '../hooks/useZoneData'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -28,13 +29,22 @@ async function sendTelegram(token, chatId, text) {
 }
 
 export default function Alerts() {
-  const [settings,    setSettings]    = useState(null)
-  const [token,       setToken]       = useState('')
-  const [chatId,      setChatId]      = useState('')
-  const [thresholds,  setThresholds]  = useState({ balcony: 30, garden: 30 })
-  const [enabled,     setEnabled]     = useState({ balcony: true, garden: true })
-  const [saving,      setSaving]      = useState(false)
-  const [testStatus,  setTestStatus]  = useState('')  // '', 'ok', 'fail'
+  const [settings,       setSettings]       = useState(null)
+  const [token,          setToken]          = useState('')
+  const [chatId,         setChatId]         = useState('')
+  const [thresholds,     setThresholds]     = useState({ balcony: 30, garden: 30 })
+  const [enabled,        setEnabled]        = useState({ balcony: true, garden: true })
+  const [offlineMinutes, setOfflineMinutes] = useState(5)
+  const [offlineEnabled, setOfflineEnabled] = useState(false)
+  const [saving,         setSaving]         = useState(false)
+  const [testStatus,     setTestStatus]     = useState('')
+
+  const device = useDeviceData('esp32-01')
+  const offlineThresholdMs = offlineMinutes * 60 * 1000
+  const isOnline  = device?.lastSeen && Date.now() - device.lastSeen < offlineThresholdMs
+  const lastSeenStr = device?.lastSeen
+    ? new Date(device.lastSeen).toLocaleTimeString()
+    : '—'
 
   useEffect(() => {
     const unsub = onValue(ref(db, 'irrigation/settings/alerts'), snap => {
@@ -43,6 +53,8 @@ export default function Alerts() {
       setSettings(val)
       setToken(val.telegram?.token ?? '')
       setChatId(val.telegram?.chatId ?? '')
+      setOfflineMinutes(val.offlineMinutes ?? 5)
+      setOfflineEnabled(val.offlineEnabled ?? false)
       const th = {}, en = {}
       for (const z of ZONES) {
         th[z.id] = val.zones?.[z.id]?.threshold ?? 30
@@ -58,6 +70,8 @@ export default function Alerts() {
     setSaving(true)
     const data = {
       telegram: { token: token.trim(), chatId: chatId.trim() },
+      offlineMinutes: Number(offlineMinutes),
+      offlineEnabled,
       zones: {}
     }
     for (const z of ZONES) {
@@ -118,6 +132,49 @@ export default function Alerts() {
             {testStatus === 'ok' ? 'Sent ✓' : testStatus === 'fail' ? 'Failed ✗' : 'Test'}
           </button>
         </div>
+      </div>
+
+      {/* Device offline */}
+      <div style={styles.card}>
+        <div style={styles.cardHeader}>
+          <span style={styles.cardTitle}>Device Offline Alert</span>
+          <label style={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={offlineEnabled}
+              onChange={e => setOfflineEnabled(e.target.checked)}
+              style={{ accentColor: '#1a7f4b' }}
+            />
+            <span style={{ color: offlineEnabled ? '#1a7f4b' : '#3a5a45', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+              {offlineEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        </div>
+        {offlineEnabled && (
+          <span style={{ ...styles.badge, background: device ? (isOnline ? '#1a7f4b' : '#e05c3a') : '#3a5a45', alignSelf: 'flex-start' }}>
+            {device ? (isOnline ? 'ONLINE' : 'OFFLINE') : 'NO DATA'} · last seen {lastSeenStr}
+          </span>
+        )}
+        <p style={styles.hint}>
+          Sends a 🔴 alert if the device stops reporting. Sends a 🟢 recovery message when it reconnects.
+          {!offlineEnabled && <strong style={{ color: '#e0b03a' }}> Disabled — enable when hardware is connected.</strong>}
+        </p>
+
+        <div style={{ ...styles.thresholdRow, opacity: offlineEnabled ? 1 : 0.4, pointerEvents: offlineEnabled ? 'auto' : 'none' }}>
+          <span style={styles.lbl}>Alert after</span>
+          <input
+            type="range"
+            min={2} max={30} step={1}
+            value={offlineMinutes}
+            onChange={e => setOfflineMinutes(e.target.value)}
+            style={{ flex: 1, accentColor: '#1a7f4b' }}
+          />
+          <span style={styles.thresholdVal}>{offlineMinutes} min</span>
+        </div>
+
+        <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
       </div>
 
       {/* Thresholds */}
@@ -185,7 +242,9 @@ export default function Alerts() {
 const styles = {
   page:         { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
   card:         { background: '#1e2d24', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
+  cardHeader:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle:    { color: '#e0f0e8', fontSize: '1rem', fontWeight: 600 },
+  badge:        { color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '5px' },
   hint:         { color: '#7aab90', fontSize: '0.8rem', margin: 0, lineHeight: 1.5 },
   lbl:          { color: '#a0c8b0', fontSize: '0.8rem' },
   input:        { background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.6rem 0.75rem', color: '#e0f0e8', fontSize: '0.9rem', outline: 'none' },
