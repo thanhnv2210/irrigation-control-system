@@ -5,13 +5,16 @@ import Control    from './views/Control'
 import Schedule   from './views/Schedule'
 import Statistics from './views/Statistics'
 import Simulator  from './views/Simulator'
+import Alerts     from './views/Alerts'
+import { useAlertMonitor } from './hooks/useAlertMonitor'
 
 const TABS = [
-  { id: 'dashboard',  label: 'Dashboard' },
-  { id: 'control',    label: 'Control'   },
-  { id: 'schedule',   label: 'Schedule'  },
-  { id: 'statistics', label: 'Stats'     },
-  { id: 'simulator',  label: 'Sim'       }
+  { id: 'dashboard',  label: 'Dash'     },
+  { id: 'control',    label: 'Control'  },
+  { id: 'schedule',   label: 'Schedule' },
+  { id: 'statistics', label: 'Stats'    },
+  { id: 'alerts',     label: 'Alerts'  },
+  { id: 'simulator',  label: 'Sim'      },
 ]
 
 function LoginScreen({ onLogin }) {
@@ -64,6 +67,11 @@ function LoginScreen({ onLogin }) {
   )
 }
 
+function AlertMonitor() {
+  useAlertMonitor()
+  return null
+}
+
 export default function App() {
   const [tab,  setTab]  = useState('dashboard')
   const [user, setUser] = useState(undefined)  // undefined = loading, null = signed out
@@ -89,11 +97,14 @@ export default function App() {
         <span style={styles.title}>Irrigation</span>
       </header>
 
+      <AlertMonitor />
+
       <main style={styles.main}>
         {tab === 'dashboard'  && <Dashboard />}
         {tab === 'control'    && <Control />}
         {tab === 'schedule'   && <Schedule />}
         {tab === 'statistics' && <Statistics />}
+        {tab === 'alerts'     && <Alerts />}
         {tab === 'simulator'  && <Simulator />}
       </main>
 
