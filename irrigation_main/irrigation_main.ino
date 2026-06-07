@@ -145,12 +145,6 @@ void enforceValveSafety() {
 // ---------------------------------------------------------------------------
 // Sensors
 // ---------------------------------------------------------------------------
-int readMoisturePercent(const Zone& z) {
-  int raw = analogRead(z.sensorPin);
-  int pct = map(raw, z.dryRaw, z.wetRaw, 0, 100);
-  return constrain(pct, 0, 100);
-}
-
 void readAndPublishSensors() {
   for (int i = 0; i < 2; i++) {
     Zone& z = zones[i];
@@ -206,6 +200,23 @@ void handleCommand(int zoneIdx, const String& action) {
   lastFirebaseOkMs = millis();
 }
 
+// ---------------------------------------------------------------------------
+// Status report — printed when stream fires with no pending command
+// ---------------------------------------------------------------------------
+void reportZoneStatus(int zoneIdx) {
+  Zone& z = zones[zoneIdx];
+  int raw = analogRead(z.sensorPin);
+  int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
+
+  Serial.printf("[Zone %s] Status — valve: %s | moisture: %d%% (raw %d) | uptime: %lus\n",
+    z.id,
+    z.valveOpen ? "OPEN" : "CLOSED",
+    pct,
+    raw,
+    millis() / 1000
+  );
+}
+
 // Stream callbacks
 void streamCallbackZ1(StreamData data) {
   if (data.dataType() == "string") {
@@ -213,6 +224,8 @@ void streamCallbackZ1(StreamData data) {
     if (action != "null" && action.length() > 0) {
       Serial.printf("[Zone %s] Command received: %s\n", zones[0].id, action.c_str());
       handleCommand(0, action);
+    } else {
+      reportZoneStatus(0);
     }
   }
 }
@@ -223,6 +236,8 @@ void streamCallbackZ2(StreamData data) {
     if (action != "null" && action.length() > 0) {
       Serial.printf("[Zone %s] Command received: %s\n", zones[1].id, action.c_str());
       handleCommand(1, action);
+    } else {
+      reportZoneStatus(1);
     }
   }
 }
