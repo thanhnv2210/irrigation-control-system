@@ -69,6 +69,32 @@ FirebaseAuth fbAuth;
 FirebaseConfig fbConfig;
 
 // ---------------------------------------------------------------------------
+// Schedule cache (M2)
+// ---------------------------------------------------------------------------
+#define MAX_SCHEDULES 10
+
+struct ScheduleEntry {
+  bool valid;
+  int  hour;
+  int  minute;
+  int  durationMinutes;
+  bool enabled;
+  bool days[7];   // 0=Sun, 1=Mon, ... 6=Sat
+};
+
+ScheduleEntry schedules[2][MAX_SCHEDULES];  // [zoneIdx][scheduleIdx]
+int           scheduleCount[2] = { 0, 0 };
+
+// Per-zone: millis() when a schedule-triggered valve should close (0 = not active)
+static uint32_t scheduleCloseAt[2] = { 0, 0 };
+
+// Tracks the last minute (0–1439) each schedule slot fired — prevents double-trigger
+static int lastFiredMin[2][MAX_SCHEDULES];
+
+static uint32_t lastScheduleCheckMs = 0;
+static uint32_t lastScheduleReloadMs = 0;
+
+// ---------------------------------------------------------------------------
 // Zone state
 // ---------------------------------------------------------------------------
 struct Zone {
@@ -129,15 +155,126 @@ void closeValve(int zoneIdx) {
 
 // ---------------------------------------------------------------------------
 // Safety: force-close any valve open longer than MAX_VALVE_MS
+//         or past its scheduled duration
 // ---------------------------------------------------------------------------
 void enforceValveSafety() {
   for (int i = 0; i < 2; i++) {
-    if (zones[i].valveOpen) {
-      uint32_t openMs = millis() - zones[i].valveOpenedAt;
-      if (openMs >= MAX_VALVE_MS) {
-        Serial.printf("[Zone %s] SAFETY: max open time reached, closing valve\n", zones[i].id);
-        closeValve(i);
+    if (!zones[i].valveOpen) continue;
+
+    // Schedule duration close
+    if (scheduleCloseAt[i] > 0 && millis() >= scheduleCloseAt[i]) {
+      Serial.printf("[Zone %s] Schedule duration elapsed, closing valve\n", zones[i].id);
+      closeValve(i);
+      scheduleCloseAt[i] = 0;
+      continue;
+    }
+
+    // Hard safety cap
+    if (millis() - zones[i].valveOpenedAt >= MAX_VALVE_MS) {
+      Serial.printf("[Zone %s] SAFETY: max open time reached, closing valve\n", zones[i].id);
+      closeValve(i);
+      scheduleCloseAt[i] = 0;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schedule loading — reads all schedules from Firebase for both zones
+// ---------------------------------------------------------------------------
+void loadSchedules() {
+  for (int zi = 0; zi < 2; zi++) {
+    scheduleCount[zi] = 0;
+    const char* zoneId = zones[zi].id;
+    String path = String("/irrigation/zones/") + zoneId + "/schedule";
+
+    if (!Firebase.getJSON(fbdo, path)) {
+      Serial.printf("[Schedule] Load failed for %s: %s\n", zoneId, fbdo.errorReason().c_str());
+      continue;
+    }
+
+    FirebaseJson& json = fbdo.jsonObject();
+    FirebaseJsonData result;
+    size_t count = json.iteratorBegin();
+    int idx = 0;
+
+    for (size_t i = 0; i < count && idx < MAX_SCHEDULES; i++) {
+      String key, value;
+      int type;
+      json.iteratorGet(i, type, key, value);
+
+      // Each key is a schedule ID — get the nested object
+      FirebaseJson entry;
+      entry.setJsonData(value);
+      FirebaseJsonData field;
+
+      ScheduleEntry& s = schedules[zi][idx];
+      s.valid = true;
+
+      entry.get(field, "hour");            s.hour            = field.success ? field.intValue : 0;
+      entry.get(field, "minute");          s.minute          = field.success ? field.intValue : 0;
+      entry.get(field, "durationMinutes"); s.durationMinutes = field.success ? field.intValue : 5;
+      entry.get(field, "enabled");         s.enabled         = field.success ? field.boolValue : false;
+
+      // Parse days array [0,1,2,...] stored as JSON array string
+      for (int d = 0; d < 7; d++) s.days[d] = false;
+      entry.get(field, "days");
+      if (field.success) {
+        FirebaseJson daysJson;
+        daysJson.setJsonData(field.stringValue);
+        FirebaseJsonData dayVal;
+        for (int d = 0; d < 7; d++) {
+          daysJson.get(dayVal, String("[") + d + "]");
+          if (dayVal.success) {
+            int dayNum = dayVal.intValue;
+            if (dayNum >= 0 && dayNum < 7) s.days[dayNum] = true;
+          }
+        }
       }
+
+      lastFiredMin[zi][idx] = -1;  // reset fired tracker
+      idx++;
+    }
+
+    json.iteratorEnd();
+    scheduleCount[zi] = idx;
+    lastFirebaseOkMs = millis();
+    Serial.printf("[Schedule] Loaded %d entries for zone %s\n", idx, zoneId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schedule checker — call every minute
+// ---------------------------------------------------------------------------
+void checkSchedules() {
+  struct tm timeInfo;
+  if (!getLocalTime(&timeInfo)) {
+    Serial.println("[Schedule] Time not available — skipping check");
+    return;
+  }
+
+  int currentMin  = timeInfo.tm_hour * 60 + timeInfo.tm_min;
+  int currentDay  = timeInfo.tm_wday;  // 0=Sun, 6=Sat
+
+  for (int zi = 0; zi < 2; zi++) {
+    if (zones[zi].valveOpen) continue;  // don't start if already open
+
+    for (int si = 0; si < scheduleCount[zi]; si++) {
+      ScheduleEntry& s = schedules[zi][si];
+      if (!s.valid || !s.enabled) continue;
+      if (!s.days[currentDay]) continue;
+
+      int schedMin = s.hour * 60 + s.minute;
+      if (schedMin != currentMin) continue;
+      if (lastFiredMin[zi][si] == currentMin) continue;  // already fired this minute
+
+      lastFiredMin[zi][si] = currentMin;
+      uint32_t durationMs  = (uint32_t)s.durationMinutes * 60000UL;
+
+      Serial.printf("[Schedule] Triggering zone %s at %02d:%02d for %d min\n",
+        zones[zi].id, s.hour, s.minute, s.durationMinutes);
+
+      openValve(zi, "schedule");
+      scheduleCloseAt[zi] = millis() + durationMs;
     }
   }
 }
@@ -350,8 +487,29 @@ void setup() {
     // Initial sensor read + heartbeat
     readAndPublishSensors();
     publishHeartbeat();
+
+    // Load schedules on boot
+    loadSchedules();
+    lastScheduleReloadMs = millis();
   } else {
     Serial.println("[Firebase] Not ready after timeout — continuing, watchdog will restart if needed");
+  }
+
+  // NTP time sync
+  configTime(TIMEZONE_OFFSET_SEC, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.println("[NTP] Waiting for time sync...");
+  struct tm timeInfo;
+  uint32_t ntpWait = millis();
+  while (!getLocalTime(&timeInfo) && millis() - ntpWait < 10000) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  if (getLocalTime(&timeInfo)) {
+    Serial.printf("[NTP] Time synced: %02d:%02d:%02d\n",
+      timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec);
+  } else {
+    Serial.println("[NTP] Sync failed — schedules will not fire until time is available");
   }
 
   Serial.println("[Boot] Setup complete");
@@ -383,6 +541,20 @@ void loop() {
     if (Firebase.ready()) {
       publishHeartbeat();
     }
+  }
+
+  // Reload schedules from Firebase every SCHEDULE_RELOAD_MS
+  if (millis() - lastScheduleReloadMs >= SCHEDULE_RELOAD_MS) {
+    lastScheduleReloadMs = millis();
+    if (Firebase.ready()) {
+      loadSchedules();
+    }
+  }
+
+  // Check schedules every minute
+  if (millis() - lastScheduleCheckMs >= 60000UL) {
+    lastScheduleCheckMs = millis();
+    checkSchedules();
   }
 
   // Firebase watchdog

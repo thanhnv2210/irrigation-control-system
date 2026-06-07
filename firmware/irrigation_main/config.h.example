@@ -34,7 +34,12 @@
 #define WET_RAW_2             1200
 
 // Safety and timing (milliseconds)
-#define MAX_VALVE_MS          600000UL   // 10 minutes — DO NOT reduce
-#define SENSOR_INTERVAL_MS    30000UL    // 30 seconds between sensor reads
-#define HEARTBEAT_INTERVAL_MS 60000UL   // 60 seconds between device heartbeats
-#define FIREBASE_TIMEOUT_MS   300000UL  // 5 minutes — restart if Firebase unreachable
+#define MAX_VALVE_MS           600000UL   // 10 minutes — DO NOT reduce
+#define SENSOR_INTERVAL_MS     30000UL    // 30 seconds between sensor reads
+#define HEARTBEAT_INTERVAL_MS  60000UL    // 60 seconds between device heartbeats
+#define FIREBASE_TIMEOUT_MS    300000UL   // 5 minutes — restart if Firebase unreachable
+#define SCHEDULE_RELOAD_MS     300000UL   // reload schedules from Firebase every 5 minutes
+
+// Timezone offset from UTC in seconds
+// Vietnam (UTC+7): 25200 | Singapore (UTC+8): 28800 | UTC: 0
+#define TIMEZONE_OFFSET_SEC    25200

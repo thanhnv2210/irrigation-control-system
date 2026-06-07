@@ -38,13 +38,15 @@ Last reviewed: 2026-06-07
 - [x] Device heartbeat: `lastSeen`, `ipAddress`, `wifiRssi`, `firmware`
 - [x] All timing via `millis()` — no `delay()` in `loop()`
 
-## M2 — Firmware: Schedules + Multi-zone
+## M2 — Firmware: Schedules + Multi-zone ✅
 
-- [ ] Read all schedules from Firebase on boot
-- [ ] Listen for schedule changes in Firebase (update local cache)
-- [ ] `checkSchedules()`: runs every minute, compares current time to entries
-- [ ] Trigger valve open/close if schedule matches, respect `enabled` flag
-- [ ] Support both zones independently
+- [x] Read all schedules from Firebase on boot
+- [x] Reload schedule cache every 5 minutes (picks up PWA edits without reboot)
+- [x] `checkSchedules()`: runs every minute, compares current time to entries
+- [x] Trigger valve open/close if schedule matches, respect `enabled` flag
+- [x] Duration tracking: closes valve after `durationMinutes`, not just the 10-min safety cap
+- [x] NTP time sync on boot (`pool.ntp.org`) with timezone offset from `config.h`
+- [x] Support both zones independently
 
 ## M3 — React PWA: Dashboard + Manual Control ✅
 
