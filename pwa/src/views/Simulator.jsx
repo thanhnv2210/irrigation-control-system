@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ref, set, push, get } from 'firebase/database'
+import { ref, set, push, get, update } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 
@@ -276,6 +276,101 @@ function ScheduleTrigger() {
 }
 
 // ---------------------------------------------------------------------------
+// Historical data seeder — generate a full day's consistent demo data
+// Schedule: 06:00 and 18:00 watering events (matches default schedules)
+// ---------------------------------------------------------------------------
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+// Moisture curve params per zone — slight difference for visual interest
+const ZONE_START = { balcony: 60, garden: 57 }
+const WATERING_TICKS = new Set([36, 108])  // 06:00 = tick 36, 18:00 = tick 108
+
+function DataSeeder() {
+  const [seedDate, setSeedDate]   = useState(todayStr)
+  const [seeding,  setSeeding]    = useState(false)
+  const [log,      setLog]        = useState([])
+
+  function addLog(msg) {
+    const ts = new Date().toLocaleTimeString()
+    setLog(l => [`[${ts}] ${msg}`, ...l].slice(0, 20))
+  }
+
+  async function generateDay() {
+    setSeeding(true)
+    const [yr, mo, dy] = seedDate.split('-').map(Number)
+    const dayStart = new Date(yr, mo - 1, dy, 0, 0, 0, 0).getTime()
+    const TICK_MS  = 10 * 60 * 1000   // 10 min per tick
+
+    const updates = {}
+    let seqN = 0
+
+    for (const zone of ZONES) {
+      let pct = ZONE_START[zone.id]
+
+      for (let tick = 0; tick < 144; tick++) {
+        const ts         = dayStart + tick * TICK_MS
+        const isWatering = WATERING_TICKS.has(tick)
+
+        if (isWatering) {
+          pct = Math.min(95, pct + 28 + Math.random() * 5)
+        } else {
+          pct = Math.max(10, pct - (0.3 + Math.random() * 0.15))
+        }
+        pct = Math.round(pct * 10) / 10
+
+        const raw   = Math.round(3200 - (pct / 100) * 2000)
+        const key   = `-seed${ts.toString(36)}${(seqN++).toString(36)}`
+        const entry = { moisturePercent: pct, rawValue: raw, timestamp: ts, valveOpen: isWatering }
+
+        updates[`irrigation/zones/${zone.id}/history/${key}`] = entry
+      }
+    }
+
+    await update(ref(db), updates)
+    addLog(`Seeded ${seedDate}: 144 readings × ${ZONES.length} zones — watering at 06:00 & 18:00`)
+    setSeeding(false)
+  }
+
+  return (
+    <div style={styles.card}>
+      <span style={styles.cardTitle}>Seed Historical Day</span>
+      <p style={styles.hint}>
+        Generates 144 readings (every 10 min) for the selected date with realistic moisture decay
+        and two watering events at <strong style={{ color: '#1a7f4b' }}>06:00</strong> and{' '}
+        <strong style={{ color: '#1a7f4b' }}>18:00</strong> — consistent with the default schedule.
+      </p>
+
+      <div style={styles.row}>
+        <input
+          type="date"
+          value={seedDate}
+          max={todayStr()}
+          onChange={e => setSeedDate(e.target.value)}
+          style={styles.dateInput}
+          disabled={seeding}
+        />
+        <button
+          style={{ ...styles.btn, background: seeding ? '#2e4a38' : '#1a7f4b', flex: 'none', padding: '0.5rem 1.25rem' }}
+          disabled={seeding}
+          onClick={generateDay}
+        >
+          {seeding ? 'Generating…' : 'Generate'}
+        </button>
+      </div>
+
+      {log.length > 0 && (
+        <div style={styles.log}>
+          {log.map((l, i) => <div key={i} style={styles.logLine}>{l}</div>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
 export default function Simulator() {
@@ -287,6 +382,7 @@ export default function Simulator() {
       <DeviceSimulator />
       <AdHocActions />
       <ScheduleTrigger />
+      <DataSeeder />
     </div>
   )
 }
@@ -314,4 +410,5 @@ const styles = {
   smallBtn:      { padding: '0.4rem 0.75rem', borderRadius: '6px', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' },
   scheduleRow:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   scheduleTime:  { color: '#a0c8b0', fontSize: '0.85rem' },
+  dateInput:     { flex: 1, background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.45rem 0.75rem', color: '#e0f0e8', fontSize: '0.9rem', outline: 'none', colorScheme: 'dark' },
 }

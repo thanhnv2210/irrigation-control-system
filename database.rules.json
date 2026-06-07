@@ -24,11 +24,11 @@
     // -----------------------------------------------------------------------
     "irrigation": {
 
-      // Device heartbeat — ESP32 writes, any owner reads
+      // Device heartbeat — ESP32 or owner writes (owner needed for simulator)
       "devices": {
         "$device_id": {
           ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-          ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+          ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
         }
       },
 
@@ -41,22 +41,23 @@
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Sensor data — ESP32 writes, any owner reads
+          // Sensor data — ESP32 or owner writes (owner needed for simulator)
           "sensor": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
           // Sensor history — ESP32 pushes entries, any owner reads
           "history": {
+            ".indexOn": ["timestamp"],
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Valve state — ESP32 writes, any owner reads
+          // Valve state — ESP32 or owner writes (owner needed for simulator)
           "valve": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
           // Command — any owner writes, ESP32 reads and clears
