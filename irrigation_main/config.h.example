@@ -1,0 +1,40 @@
+// config.h.example — copy to config.h and fill in real values
+// config.h is gitignored and must never be committed.
+
+#pragma once
+
+// Firebase credentials
+#define FIREBASE_API_KEY      "your-api-key"
+#define FIREBASE_EMAIL        "your-email@example.com"
+#define FIREBASE_PASSWORD     "your-password"
+#define FIREBASE_DB_URL       "your-project-default-rtdb.region.firebasedatabase.app"
+
+// Zone IDs (must match keys used in Firebase RTDB)
+#define ZONE_1_ID             "balcony"
+#define ZONE_2_ID             "garden"
+
+// Device ID (unique per physical ESP32)
+#define DEVICE_ID             "esp32-01"
+
+// Firmware version
+#define FIRMWARE_VERSION      "1.0.0"
+
+// GPIO pins
+#define SENSOR_1_PIN          34   // ADC1 — zone 1 soil moisture
+#define SENSOR_2_PIN          35   // ADC1 — zone 2 soil moisture
+#define RELAY_1_PIN           26   // Active-LOW relay — zone 1 valve
+#define RELAY_2_PIN           27   // Active-LOW relay — zone 2 valve
+
+// Soil moisture calibration — measure from real hardware before filling in
+// Zone 1
+#define DRY_RAW_1             3200  // ADC reading in completely dry soil
+#define WET_RAW_1             1200  // ADC reading in saturated soil
+// Zone 2
+#define DRY_RAW_2             3200
+#define WET_RAW_2             1200
+
+// Safety and timing (milliseconds)
+#define MAX_VALVE_MS          600000UL   // 10 minutes — DO NOT reduce
+#define SENSOR_INTERVAL_MS    30000UL    // 30 seconds between sensor reads
+#define HEARTBEAT_INTERVAL_MS 60000UL   // 60 seconds between device heartbeats
+#define FIREBASE_TIMEOUT_MS   300000UL  // 5 minutes — restart if Firebase unreachable

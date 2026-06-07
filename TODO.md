@@ -11,8 +11,8 @@ Last reviewed: 2026-06-07
 | `esp_32_auto_config_v1/` | Working — WiFi captive portal, Preferences flash storage |
 | `elb_peripheral_v1/` | Proof of concept only — hardcoded creds, TCP server (discard TCP) |
 | `Firebase_Sample_2/` | Reference only — mobizt library sample with hardcoded creds |
-| `irrigation_main/` | **NOT CREATED** |
-| `config.h.example` | **NOT CREATED** |
+| `irrigation_main/` | Created — `irrigation_main.ino` + `config.h.example` |
+| `config.h.example` | Created — copy to `config.h` and fill in credentials |
 | Firebase `irrigation/` path | **EMPTY** — project exists, only `iot2025/` data is present |
 | React PWA | **NOT STARTED** |
 | Hardware | **NOT ASSEMBLED** |
@@ -21,22 +21,22 @@ Last reviewed: 2026-06-07
 
 ## M1 — Firmware: Core Loop
 
-- [ ] Create `irrigation_main/` sketch directory and `irrigation_main.ino`
-- [ ] Create `config.h.example` with all placeholder values
-- [ ] WiFi: read SSID/password from `Preferences` flash on boot (from `esp_32_auto_config_v1` pattern)
-- [ ] WiFi: fallback to AP mode (`ESP32_Config` / `123456789`) if no stored creds or connection fails
-- [ ] Firebase: init using `config.h` constants (API key, email, password, DB URL)
-- [ ] Sensor: read raw ADC from GPIO 34 (zone 1) and GPIO 35 (zone 2) every 30s
-- [ ] Sensor: map raw ADC to `moisturePercent` using calibration values from `config.h`
-- [ ] Sensor: publish `sensor/moisturePercent`, `sensor/rawValue`, `sensor/timestamp` to Firebase
-- [ ] Relay: initialize both relays CLOSED (HIGH) on cold start
-- [ ] Relay: `openValve()` / `closeValve()` functions with safety cutoff (max 10 min = 600,000 ms)
-- [ ] Firebase listener: subscribe to `command/action` for each zone
-- [ ] Firebase command handler: act on `OPEN`/`CLOSE`, write back `valve/state`, clear `command/action` to `null`
-- [ ] `enforceValveSafety()`: force-close valve if open > `MAX_VALVE_MS`, runs every loop iteration
-- [ ] Watchdog: restart ESP32 if Firebase unreachable > 5 minutes
-- [ ] Device heartbeat: write `devices/{device_id}/lastSeen`, `ipAddress`, `wifiRssi`, `firmware` on connect and periodically
-- [ ] Use `millis()` for all timing — no `delay()` in `loop()`
+- [x] Create `irrigation_main/` sketch directory and `irrigation_main.ino`
+- [x] Create `config.h.example` with all placeholder values
+- [x] WiFi: read SSID/password from `Preferences` flash on boot (from `esp_32_auto_config_v1` pattern)
+- [x] WiFi: fallback to AP mode (`ESP32_Config` / `123456789`) if no stored creds or connection fails
+- [x] Firebase: init using `config.h` constants (API key, email, password, DB URL)
+- [x] Sensor: read raw ADC from GPIO 34 (zone 1) and GPIO 35 (zone 2) every 30s
+- [x] Sensor: map raw ADC to `moisturePercent` using calibration values from `config.h`
+- [x] Sensor: publish `sensor/moisturePercent`, `sensor/rawValue`, `sensor/timestamp` to Firebase
+- [x] Relay: initialize both relays CLOSED (HIGH) on cold start
+- [x] Relay: `openValve()` / `closeValve()` functions with safety cutoff (max 10 min = 600,000 ms)
+- [x] Firebase listener: subscribe to `command/action` for each zone
+- [x] Firebase command handler: act on `OPEN`/`CLOSE`, write back `valve/state`, clear `command/action` to `null`
+- [x] `enforceValveSafety()`: force-close valve if open > `MAX_VALVE_MS`, runs every loop iteration
+- [x] Watchdog: restart ESP32 if Firebase unreachable > 5 minutes
+- [x] Device heartbeat: write `devices/{device_id}/lastSeen`, `ipAddress`, `wifiRssi`, `firmware` on connect and periodically
+- [x] Use `millis()` for all timing — no `delay()` in `loop()`
 
 ## M2 — Firmware: Schedules + Multi-zone
 
