@@ -288,18 +288,31 @@ void readAndPublishSensors() {
     int raw = analogRead(z.sensorPin);
     int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
 
-    String basePath = String("/irrigation/zones/") + z.id + "/sensor";
+    String basePath = String("/irrigation/zones/") + z.id;
 
-    FirebaseJson json;
-    json.set("moisturePercent", pct);
-    json.set("rawValue",        raw);
-    json.set("timestamp/.sv",   "timestamp");  // server timestamp
+    // Overwrite current sensor reading
+    FirebaseJson sensorJson;
+    sensorJson.set("moisturePercent", pct);
+    sensorJson.set("rawValue",        raw);
+    sensorJson.set("timestamp/.sv",   "timestamp");
 
-    if (Firebase.updateNode(fbdo, basePath, json)) {
+    if (Firebase.updateNode(fbdo, basePath + "/sensor", sensorJson)) {
       lastFirebaseOkMs = millis();
       Serial.printf("[Zone %s] Moisture: %d%% (raw %d)\n", z.id, pct, raw);
     } else {
       Serial.printf("[Zone %s] Sensor publish failed: %s\n", z.id, fbdo.errorReason().c_str());
+      continue;
+    }
+
+    // Push to history for statistics (one entry per reading)
+    FirebaseJson histJson;
+    histJson.set("moisturePercent", pct);
+    histJson.set("rawValue",        raw);
+    histJson.set("timestamp/.sv",   "timestamp");
+
+    String histPath = basePath + "/history";
+    if (!Firebase.pushJSON(fbdo, histPath, histJson)) {
+      Serial.printf("[Zone %s] History push failed: %s\n", z.id, fbdo.errorReason().c_str());
     }
   }
 }

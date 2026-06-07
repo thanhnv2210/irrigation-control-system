@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { auth, signIn, onAuthStateChanged } from './firebase'
-import Dashboard from './views/Dashboard'
-import Control   from './views/Control'
-import Schedule  from './views/Schedule'
+import Dashboard  from './views/Dashboard'
+import Control    from './views/Control'
+import Schedule   from './views/Schedule'
+import Statistics from './views/Statistics'
 
 const TABS = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'control',   label: 'Control'   },
-  { id: 'schedule',  label: 'Schedule'  }
+  { id: 'dashboard',  label: 'Dashboard'  },
+  { id: 'control',    label: 'Control'    },
+  { id: 'schedule',   label: 'Schedule'   },
+  { id: 'statistics', label: 'Stats'      }
 ]
 
 function LoginScreen({ onLogin }) {
@@ -86,9 +88,10 @@ export default function App() {
       </header>
 
       <main style={styles.main}>
-        {tab === 'dashboard' && <Dashboard />}
-        {tab === 'control'   && <Control />}
-        {tab === 'schedule'  && <Schedule />}
+        {tab === 'dashboard'  && <Dashboard />}
+        {tab === 'control'    && <Control />}
+        {tab === 'schedule'   && <Schedule />}
+        {tab === 'statistics' && <Statistics />}
       </main>
 
       <nav style={styles.nav}>

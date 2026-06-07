@@ -47,6 +47,12 @@
             ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
           },
 
+          // Sensor history — ESP32 pushes entries, any owner reads
+          "history": {
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
+          },
+
           // Valve state — ESP32 writes, any owner reads
           "valve": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
