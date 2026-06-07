@@ -4,12 +4,14 @@ import Dashboard  from './views/Dashboard'
 import Control    from './views/Control'
 import Schedule   from './views/Schedule'
 import Statistics from './views/Statistics'
+import Simulator  from './views/Simulator'
 
 const TABS = [
-  { id: 'dashboard',  label: 'Dashboard'  },
-  { id: 'control',    label: 'Control'    },
-  { id: 'schedule',   label: 'Schedule'   },
-  { id: 'statistics', label: 'Stats'      }
+  { id: 'dashboard',  label: 'Dashboard' },
+  { id: 'control',    label: 'Control'   },
+  { id: 'schedule',   label: 'Schedule'  },
+  { id: 'statistics', label: 'Stats'     },
+  { id: 'simulator',  label: 'Sim'       }
 ]
 
 function LoginScreen({ onLogin }) {
@@ -92,6 +94,7 @@ export default function App() {
         {tab === 'control'    && <Control />}
         {tab === 'schedule'   && <Schedule />}
         {tab === 'statistics' && <Statistics />}
+        {tab === 'simulator'  && <Simulator />}
       </main>
 
       <nav style={styles.nav}>

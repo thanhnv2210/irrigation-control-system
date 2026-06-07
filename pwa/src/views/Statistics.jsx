@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer
 } from 'recharts'
-import { useHistory } from '../hooks/useHistory'
+import { useHistory, useHistoryByDate } from '../hooks/useHistory'
 
 const ZONES   = [{ id: 'balcony', label: 'Balcony' }, { id: 'garden', label: 'Garden' }]
 const RANGES  = [
@@ -12,14 +12,14 @@ const RANGES  = [
   { label: '24h', points: 144 },
 ]
 
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 function formatTime(ts) {
   const d = new Date(ts)
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-}
-
-function formatDate(ts) {
-  const d = new Date(ts)
-  return `${d.getMonth()+1}/${d.getDate()} ${formatTime(ts)}`
 }
 
 function StatCard({ label, value, unit, color }) {
@@ -31,24 +31,55 @@ function StatCard({ label, value, unit, color }) {
   )
 }
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
+  const d = payload[0].payload
   return (
     <div style={styles.tooltip}>
-      <p style={styles.tooltipTime}>{label}</p>
-      <p style={styles.tooltipVal}>{payload[0].value}%</p>
+      <p style={styles.tooltipTime}>{d.fullTime}</p>
+      <p style={styles.tooltipVal}>{d.moisture}%</p>
+      {d.watering && <p style={styles.tooltipWater}>Watering</p>}
     </div>
   )
 }
 
-function ZoneChart({ zoneId, label, points }) {
-  const { history, loading } = useHistory(zoneId, points)
+// Detect watering events: consecutive readings where moisture rose >= threshold
+function detectWateringBands(entries, threshold = 4) {
+  const bands = []
+  let inBand = false
+  let bandStart = null
 
-  const data = history.map(h => ({
-    time:    formatTime(h.timestamp),
-    fullTs:  formatDate(h.timestamp),
-    moisture: h.moisturePercent
-  }))
+  for (let i = 1; i < entries.length; i++) {
+    const rise = entries[i].moisturePercent - entries[i-1].moisturePercent
+    if (rise >= threshold && !inBand) {
+      inBand = true
+      bandStart = entries[i-1].timestamp
+    } else if (rise < threshold && inBand) {
+      inBand = false
+      bands.push({ start: bandStart, end: entries[i-1].timestamp })
+    }
+  }
+  if (inBand && bandStart !== null) {
+    bands.push({ start: bandStart, end: entries[entries.length-1].timestamp })
+  }
+  return bands
+}
+
+function ZoneChart({ zoneId, label, mode, range, dateStr }) {
+  const recent  = useHistory(zoneId, range.points)
+  const byDate  = useHistoryByDate(zoneId, mode === 'date' ? dateStr : null)
+
+  const { history, loading } = mode === 'date' ? byDate : recent
+
+  const data = history.map((h, i) => {
+    const rise = i > 0 ? h.moisturePercent - history[i-1].moisturePercent : 0
+    return {
+      time:     formatTime(h.timestamp),
+      fullTime: new Date(h.timestamp).toLocaleTimeString(),
+      moisture: h.moisturePercent,
+      watering: rise >= 4
+    }
+  })
 
   const values   = history.map(h => h.moisturePercent)
   const avg      = values.length ? Math.round(values.reduce((a,b) => a+b, 0) / values.length) : null
@@ -62,13 +93,19 @@ function ZoneChart({ zoneId, label, points }) {
     : current < 60 ? '#e0b03a'
     : '#1a7f4b'
 
+  // Watering bands for reference lines
+  const bands = detectWateringBands(history)
+
+  // Tick density — for full-day view, show every hour label
+  const tickInterval = mode === 'date' ? Math.max(1, Math.floor(data.length / 12)) : 'preserveStartEnd'
+
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
         <span style={styles.zoneName}>{label}</span>
         {trend !== 0 && (
           <span style={{ color: trend > 0 ? '#1a7f4b' : '#e05c3a', fontSize: '0.8rem' }}>
-            {trend > 0 ? '▲' : '▼'} {Math.abs(trend)}%
+            {trend > 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}%
           </span>
         )}
       </div>
@@ -76,7 +113,11 @@ function ZoneChart({ zoneId, label, points }) {
       {loading ? (
         <div style={styles.empty}>Loading...</div>
       ) : history.length === 0 ? (
-        <div style={styles.empty}>No history yet — data appears after first device reading</div>
+        <div style={styles.empty}>
+          {mode === 'date'
+            ? 'No data for this date — try another day or run the simulator.'
+            : 'No history yet — data appears after first device reading'}
+        </div>
       ) : (
         <>
           <div style={styles.statsRow}>
@@ -86,13 +127,32 @@ function ZoneChart({ zoneId, label, points }) {
             <StatCard label="Max"     value={max ?? '—'}     unit="%" color="#1a7f4b" />
           </div>
 
-          <ResponsiveContainer width="100%" height={180}>
+          {bands.length > 0 && (
+            <div style={styles.legendRow}>
+              <span style={styles.legendDot} />
+              <span style={styles.legendText}>Watering detected ({bands.length} event{bands.length !== 1 ? 's' : ''})</span>
+            </div>
+          )}
+
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+              {/* Watering bands as reference areas via paired reference lines */}
+              {bands.map((b, i) => {
+                const startIdx = history.findIndex(h => h.timestamp >= b.start)
+                const endIdx   = history.findIndex(h => h.timestamp >= b.end)
+                const startTime = startIdx >= 0 ? formatTime(history[startIdx].timestamp) : null
+                const endTime   = endIdx   >= 0 ? formatTime(history[endIdx].timestamp)   : null
+                return startTime ? (
+                  <ReferenceLine key={`w${i}`} x={startTime} stroke="#1a7f4b" strokeWidth={2}
+                    strokeDasharray="2 2" strokeOpacity={0.6} />
+                ) : null
+              })}
+
               <CartesianGrid strokeDasharray="3 3" stroke="#2e4a38" />
               <XAxis
                 dataKey="time"
                 tick={{ fill: '#7aab90', fontSize: 10 }}
-                interval="preserveStartEnd"
+                interval={tickInterval}
               />
               <YAxis
                 domain={[0, 100]}
@@ -100,8 +160,10 @@ function ZoneChart({ zoneId, label, points }) {
                 tickFormatter={v => `${v}%`}
               />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={30} stroke="#e05c3a" strokeDasharray="4 2" label={{ value: 'Dry', fill: '#e05c3a', fontSize: 10 }} />
-              <ReferenceLine y={60} stroke="#1a7f4b" strokeDasharray="4 2" label={{ value: 'Healthy', fill: '#1a7f4b', fontSize: 10 }} />
+              <ReferenceLine y={30} stroke="#e05c3a" strokeDasharray="4 2"
+                label={{ value: 'Dry', fill: '#e05c3a', fontSize: 10 }} />
+              <ReferenceLine y={60} stroke="#1a7f4b" strokeDasharray="4 2"
+                label={{ value: 'Healthy', fill: '#1a7f4b', fontSize: 10 }} />
               <Line
                 type="monotone"
                 dataKey="moisture"
@@ -112,6 +174,8 @@ function ZoneChart({ zoneId, label, points }) {
               />
             </LineChart>
           </ResponsiveContainer>
+
+          <p style={styles.hint}>{data.length} readings</p>
         </>
       )}
     </div>
@@ -119,43 +183,86 @@ function ZoneChart({ zoneId, label, points }) {
 }
 
 export default function Statistics() {
-  const [range, setRange] = useState(RANGES[1])  // default 8h
+  const [mode,    setMode]    = useState('recent')   // 'recent' | 'date'
+  const [range,   setRange]   = useState(RANGES[1])  // default 8h
+  const [dateStr, setDateStr] = useState(todayStr)
 
   return (
     <div style={styles.page}>
-      <div style={styles.rangeRow}>
-        {RANGES.map(r => (
-          <button
-            key={r.label}
-            style={{ ...styles.rangeBtn, ...(range.label === r.label ? styles.rangeActive : {}) }}
-            onClick={() => setRange(r)}
-          >
-            {r.label}
-          </button>
-        ))}
+      {/* Mode toggle */}
+      <div style={styles.modeRow}>
+        <button
+          style={{ ...styles.modeBtn, ...(mode === 'recent' ? styles.modeActive : {}) }}
+          onClick={() => setMode('recent')}
+        >Recent</button>
+        <button
+          style={{ ...styles.modeBtn, ...(mode === 'date' ? styles.modeActive : {}) }}
+          onClick={() => setMode('date')}
+        >By Date</button>
       </div>
+
+      {/* Controls */}
+      {mode === 'recent' ? (
+        <div style={styles.rangeRow}>
+          {RANGES.map(r => (
+            <button
+              key={r.label}
+              style={{ ...styles.rangeBtn, ...(range.label === r.label ? styles.rangeActive : {}) }}
+              onClick={() => setRange(r)}
+            >{r.label}</button>
+          ))}
+        </div>
+      ) : (
+        <div style={styles.dateRow}>
+          <input
+            type="date"
+            value={dateStr}
+            max={todayStr()}
+            onChange={e => setDateStr(e.target.value)}
+            style={styles.dateInput}
+          />
+        </div>
+      )}
+
       {ZONES.map(z => (
-        <ZoneChart key={z.id} zoneId={z.id} label={z.label} points={range.points} />
+        <ZoneChart
+          key={z.id}
+          zoneId={z.id}
+          label={z.label}
+          mode={mode}
+          range={range}
+          dateStr={dateStr}
+        />
       ))}
     </div>
   )
 }
 
 const styles = {
-  page:       { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
-  rangeRow:   { display: 'flex', gap: '0.5rem' },
-  rangeBtn:   { padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.85rem', cursor: 'pointer' },
-  rangeActive:{ background: '#1a7f4b', color: '#fff', borderColor: '#1a7f4b' },
-  card:       { background: '#1e2d24', borderRadius: '12px', padding: '1.25rem' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' },
-  zoneName:   { color: '#e0f0e8', fontSize: '1.1rem', fontWeight: 600 },
-  statsRow:   { display: 'flex', gap: '0.5rem', marginBottom: '1rem' },
-  statCard:   { flex: 1, background: '#162a1e', borderRadius: '8px', padding: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' },
-  statLabel:  { color: '#7aab90', fontSize: '0.7rem' },
-  statValue:  { fontSize: '1.1rem', fontWeight: 700 },
-  statUnit:   { fontSize: '0.7rem', fontWeight: 400 },
-  empty:      { color: '#7aab90', fontSize: '0.85rem', textAlign: 'center', padding: '2rem 0' },
-  tooltip:    { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.5rem 0.75rem' },
-  tooltipTime:{ color: '#7aab90', fontSize: '0.75rem', margin: 0 },
-  tooltipVal: { color: '#e0f0e8', fontWeight: 700, fontSize: '1rem', margin: 0 }
+  page:        { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
+  modeRow:     { display: 'flex', gap: '0.5rem' },
+  modeBtn:     { flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.85rem', cursor: 'pointer' },
+  modeActive:  { background: '#2e4a38', color: '#e0f0e8', borderColor: '#1a7f4b', fontWeight: 600 },
+  rangeRow:    { display: 'flex', gap: '0.5rem' },
+  rangeBtn:    { padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.85rem', cursor: 'pointer' },
+  rangeActive: { background: '#1a7f4b', color: '#fff', borderColor: '#1a7f4b' },
+  dateRow:     { display: 'flex' },
+  dateInput:   { flex: 1, background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.5rem 0.75rem', color: '#e0f0e8', fontSize: '0.9rem', outline: 'none', colorScheme: 'dark' },
+  card:        { background: '#1e2d24', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
+  cardHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  zoneName:    { color: '#e0f0e8', fontSize: '1.1rem', fontWeight: 600 },
+  statsRow:    { display: 'flex', gap: '0.5rem' },
+  statCard:    { flex: 1, background: '#162a1e', borderRadius: '8px', padding: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' },
+  statLabel:   { color: '#7aab90', fontSize: '0.7rem' },
+  statValue:   { fontSize: '1.1rem', fontWeight: 700 },
+  statUnit:    { fontSize: '0.7rem', fontWeight: 400 },
+  legendRow:   { display: 'flex', alignItems: 'center', gap: '0.4rem' },
+  legendDot:   { width: '8px', height: '8px', borderRadius: '50%', background: '#1a7f4b', flexShrink: 0 },
+  legendText:  { color: '#7aab90', fontSize: '0.75rem' },
+  empty:       { color: '#7aab90', fontSize: '0.85rem', textAlign: 'center', padding: '2rem 0' },
+  hint:        { color: '#3a5a45', fontSize: '0.72rem', margin: 0 },
+  tooltip:     { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.5rem 0.75rem' },
+  tooltipTime: { color: '#7aab90', fontSize: '0.75rem', margin: 0 },
+  tooltipVal:  { color: '#e0f0e8', fontWeight: 700, fontSize: '1rem', margin: 0 },
+  tooltipWater:{ color: '#1a7f4b', fontSize: '0.75rem', margin: 0 },
 }
