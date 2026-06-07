@@ -8,67 +8,66 @@ Last reviewed: 2026-06-07
 
 | Item | Status |
 |---|---|
-| `esp_32_auto_config_v1/` | Working — WiFi captive portal, Preferences flash storage |
-| `elb_peripheral_v1/` | Proof of concept only — hardcoded creds, TCP server (discard TCP) |
-| `Firebase_Sample_2/` | Reference only — mobizt library sample with hardcoded creds |
-| `irrigation_main/` | Created — `irrigation_main.ino` + `config.h.example` |
-| `config.h.example` | Created — copy to `config.h` and fill in credentials |
-| Firebase `irrigation/` path | **EMPTY** — project exists, only `iot2025/` data is present |
-| React PWA | **NOT STARTED** |
-| Hardware | **NOT ASSEMBLED** |
+| `firmware/esp_32_auto_config_v1/` | Working — WiFi captive portal, Preferences flash storage |
+| `firmware/elb_peripheral_v1/` | Proof of concept only — reference only |
+| `firmware/Firebase_Sample_2/` | Reference only |
+| `firmware/irrigation_main/` | Complete — M1 done, pending physical hardware |
+| `config.h` | Created with device credentials |
+| Firebase `irrigation/` path | Seeded with test data |
+| Firebase security rules | Deployed |
+| React PWA | Complete — Dashboard, Control, Schedule views |
+| Hardware | NOT ASSEMBLED — ESP32 38-pin DevKit ordered |
 
 ---
 
-## M1 — Firmware: Core Loop
+## M1 — Firmware: Core Loop ✅
 
 - [x] Create `irrigation_main/` sketch directory and `irrigation_main.ino`
 - [x] Create `config.h.example` with all placeholder values
-- [x] WiFi: read SSID/password from `Preferences` flash on boot (from `esp_32_auto_config_v1` pattern)
-- [x] WiFi: fallback to AP mode (`ESP32_Config` / `123456789`) if no stored creds or connection fails
-- [x] Firebase: init using `config.h` constants (API key, email, password, DB URL)
+- [x] WiFi: read SSID/password from `Preferences` flash on boot
+- [x] WiFi: fallback to AP mode if no creds or connection fails
+- [x] Firebase: init using `config.h` constants
 - [x] Sensor: read raw ADC from GPIO 34 (zone 1) and GPIO 35 (zone 2) every 30s
-- [x] Sensor: map raw ADC to `moisturePercent` using calibration values from `config.h`
-- [x] Sensor: publish `sensor/moisturePercent`, `sensor/rawValue`, `sensor/timestamp` to Firebase
+- [x] Sensor: map raw ADC to `moisturePercent`, publish to Firebase
 - [x] Relay: initialize both relays CLOSED (HIGH) on cold start
-- [x] Relay: `openValve()` / `closeValve()` functions with safety cutoff (max 10 min = 600,000 ms)
+- [x] Relay: `openValve()` / `closeValve()` with 10-minute safety cutoff
 - [x] Firebase listener: subscribe to `command/action` for each zone
-- [x] Firebase command handler: act on `OPEN`/`CLOSE`, write back `valve/state`, clear `command/action` to `null`
-- [x] `enforceValveSafety()`: force-close valve if open > `MAX_VALVE_MS`, runs every loop iteration
+- [x] Firebase command handler: act, write back `valve/state`, clear `command/action`
+- [x] `enforceValveSafety()`: force-close valve if open > `MAX_VALVE_MS`
 - [x] Watchdog: restart ESP32 if Firebase unreachable > 5 minutes
-- [x] Device heartbeat: write `devices/{device_id}/lastSeen`, `ipAddress`, `wifiRssi`, `firmware` on connect and periodically
-- [x] Use `millis()` for all timing — no `delay()` in `loop()`
+- [x] Device heartbeat: `lastSeen`, `ipAddress`, `wifiRssi`, `firmware`
+- [x] All timing via `millis()` — no `delay()` in `loop()`
 
 ## M2 — Firmware: Schedules + Multi-zone
 
-- [ ] Read all schedules from `irrigation/zones/{zone_id}/schedule/` on boot
+- [ ] Read all schedules from Firebase on boot
 - [ ] Listen for schedule changes in Firebase (update local cache)
-- [ ] `checkSchedules()`: runs every minute, compares current time to schedule entries
+- [ ] `checkSchedules()`: runs every minute, compares current time to entries
 - [ ] Trigger valve open/close if schedule matches, respect `enabled` flag
-- [ ] Support both zones independently with separate `FirebaseData` stream objects
+- [ ] Support both zones independently
 
-## M3 — React PWA: Dashboard + Manual Control
+## M3 — React PWA: Dashboard + Manual Control ✅
 
-- [ ] Scaffold new repo at `/Users/ThanhNguyen/AI_WS/irrigation-pwa` (Vite + React 18)
-- [ ] Add `vite-plugin-pwa` + web manifest
-- [ ] Firebase JS SDK v9 (modular) init
-- [ ] `useZoneData` hook — `onValue()` subscriptions for both zones, unsubscribed on unmount
-- [ ] Dashboard view: moisture gauge, valve state, last watered time, device last seen
-- [ ] Manual control view: OPEN/CLOSE buttons per zone with confirmation dialog
-- [ ] Manual control writes to `command/` path only — never writes `valve/state` directly
-- [ ] Mobile-first layout: min 375px viewport, no horizontal scroll
+- [x] Scaffold Vite + React 18 in `pwa/`
+- [x] Add `vite-plugin-pwa` + web manifest
+- [x] Firebase JS SDK v9 (modular) init
+- [x] `useZoneData` hook — `onValue()` subscriptions, unsubscribed on unmount
+- [x] Dashboard view: moisture gauge, valve state, device last seen / online indicator
+- [x] Manual control view: OPEN/CLOSE per zone with confirmation dialog
+- [x] Manual control writes to `command/` path only
+- [x] Mobile-first layout
 
-## M4 — React PWA: Schedule Editor
+## M4 — React PWA: Schedule Editor ✅
 
-- [ ] Schedule view: list schedules per zone
-- [ ] Add / edit / delete schedule entries
-- [ ] Write schedule changes to `irrigation/zones/{zone_id}/schedule/` in Firebase
+- [x] Schedule view: list schedules per zone
+- [x] Add / edit / delete schedule entries
+- [x] Write schedule changes to Firebase
 
 ## M5 — Hardening
 
-- [ ] Firebase security rules: restrict ESP32 device writes to `sensor/` and `valve/` paths only
-- [ ] Firebase security rules: restrict app writes to `command/` and `schedule/` paths only
+- [x] Firebase security rules: device and app access restricted per path
 - [ ] Low moisture alert: in-app notification or Telegram bot
-- [ ] Seasonal threshold review (schedule for 4 weeks after first live data)
+- [ ] Seasonal threshold review (4 weeks after first live data)
 
 ---
 
@@ -77,16 +76,15 @@ Last reviewed: 2026-06-07
 | Item | Blocker |
 |---|---|
 | Sensor calibration values (`DRY_RAW`, `WET_RAW`) | Must be measured from physical hardware |
-| `config.h` credentials | Owner to fill in — never generated by Claude |
 | `MAX_VALVE_MS` confirmation | Physical safety decision — owner to confirm 600,000 ms |
-| Hardware assembly and wiring | Owner action |
-| First live flash and valve test | Owner action — do not test with water supply active until wiring is verified |
+| Hardware assembly and wiring | ESP32 38-pin DevKit ordered — assemble on arrival |
+| First live flash and valve test | Do not test with water supply until wiring is verified |
+| Fill in Firebase password in `config.h` | Owner action |
 
 ---
 
-## Notes
+## Next Actions
 
-- Firebase credentials are present in `Firebase_Sample_2/Firebase_Sample_2.ino` (hardcoded — reference file only, not production code). Do not copy those values anywhere; use `config.h`.
-- WiFi credentials are hardcoded in `elb_peripheral_v1/` — that sketch is not used in production.
-- All timing in production firmware must use `millis()`, never `delay()` in `loop()`.
-- The `irrigation/` Firebase path is empty — the schema will be created by the first firmware write.
+1. **M2 — Schedule firmware logic** (can do now, no hardware needed)
+2. **Hardware arrives** → assemble, flash, calibrate sensors, verify Serial Monitor output
+3. **M5** — low moisture alert after live data is flowing
