@@ -1,5 +1,8 @@
 # Credentials — never commit
 firmware/irrigation_main/config.h
+pwa/.env
+pwa/.env.local
+pwa/.env.*.local
 
 # Arduino build artifacts
 build/

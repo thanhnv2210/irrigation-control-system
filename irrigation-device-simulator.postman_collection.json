@@ -1,18 +1,21 @@
 {
   "info": {
     "name": "Irrigation — Device Simulator",
-    "description": "Simulates ESP32 firmware behavior against Firebase RTDB.\nRun requests in order to reproduce device lifecycle:\n1. Auth — get token\n2. Heartbeat — device comes online\n3. Sensor publish — moisture readings\n4. Command poll — check for pending commands\n5. Command execute — act on OPEN/CLOSE\n6. Valve state write — confirm valve state back to Firebase\n\nSet the 'password' variable before running.",
+    "description": "Simulates ESP32 firmware behavior against Firebase RTDB.\n\nAccounts:\n- Owner (test): owner-irrigation@app.local / IrrigationOwner2026!\n- ESP32 device: esp32-irrigation@device.local / KqEodVoVeUx8JD6qchDrtw==\n\nRun order:\n1. Auth — sign in as device OR owner\n2. Heartbeat — device comes online\n3. Sensor publish — moisture readings\n4. Valve state — write OPEN/CLOSED\n5. Command channel — issue (owner) and clear (device)\n6. Full boot sequence — all steps in order",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "api_key",     "value": "AIzaSyDEAP1XKmK8t1qt4fuXYN2ndZ3pbNNlLTU" },
-    { "key": "db_url",      "value": "https://smarthomeapp-982da-default-rtdb.asia-southeast1.firebasedatabase.app" },
-    { "key": "device_email","value": "esp32-irrigation@device.local" },
-    { "key": "device_pass", "value": "KqEodVoVeUx8JD6qchDrtw==" },
-    { "key": "id_token",    "value": "" },
-    { "key": "zone1",       "value": "balcony" },
-    { "key": "zone2",       "value": "garden" },
-    { "key": "device_id",   "value": "esp32-01" }
+    { "key": "api_key",      "value": "AIzaSyDEAP1XKmK8t1qt4fuXYN2ndZ3pbNNlLTU" },
+    { "key": "db_url",       "value": "https://smarthomeapp-982da-default-rtdb.asia-southeast1.firebasedatabase.app" },
+    { "key": "device_email", "value": "esp32-irrigation@device.local" },
+    { "key": "device_pass",  "value": "KqEodVoVeUx8JD6qchDrtw==" },
+    { "key": "owner_email",  "value": "owner-irrigation@app.local" },
+    { "key": "owner_pass",   "value": "IrrigationOwner2026!" },
+    { "key": "device_token", "value": "" },
+    { "key": "owner_token",  "value": "" },
+    { "key": "zone1",        "value": "balcony" },
+    { "key": "zone2",        "value": "garden" },
+    { "key": "device_id",    "value": "esp32-01" }
   ],
   "item": [
     {
@@ -27,8 +30,8 @@
                 "exec": [
                   "const res = pm.response.json();",
                   "if (res.idToken) {",
-                  "  pm.collectionVariables.set('id_token', res.idToken);",
-                  "  pm.test('Token obtained', () => pm.expect(res.idToken).to.be.a('string'));",
+                  "  pm.collectionVariables.set('device_token', res.idToken);",
+                  "  pm.test('Device token obtained', () => pm.expect(res.idToken).to.be.a('string'));",
                   "} else {",
                   "  pm.test('Auth failed', () => pm.expect.fail(JSON.stringify(res)));",
                   "}"
@@ -43,6 +46,34 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{device_email}}\",\n  \"password\": \"{{device_pass}}\",\n  \"returnSecureToken\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Sign in as owner (test account)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.collectionVariables.set('owner_token', res.idToken);",
+                  "  pm.test('Owner token obtained', () => pm.expect(res.idToken).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Auth failed', () => pm.expect.fail(JSON.stringify(res)));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{api_key}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_pass}}\",\n  \"returnSecureToken\": true\n}"
             }
           }
         }
@@ -66,7 +97,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firmware\": \"1.0.0\",\n  \"ipAddress\": \"192.168.1.99\",\n  \"wifiRssi\": -58,\n  \"lastSeen\": {\".sv\": \"timestamp\"}\n}"
@@ -79,7 +110,7 @@
       "name": "3. Sensor Publish",
       "item": [
         {
-          "name": "Publish zone 1 (balcony) sensor — healthy moisture",
+          "name": "Zone 1 (balcony) — healthy (62%)",
           "event": [
             {
               "listen": "test",
@@ -93,7 +124,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 62,\n  \"rawValue\": 1840,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -101,11 +132,11 @@
           }
         },
         {
-          "name": "Publish zone 1 (balcony) sensor — dry (alert threshold)",
+          "name": "Zone 1 (balcony) — dry (22%) — red gauge",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 22,\n  \"rawValue\": 3000,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -113,11 +144,11 @@
           }
         },
         {
-          "name": "Publish zone 2 (garden) sensor — healthy moisture",
+          "name": "Zone 2 (garden) — healthy (45%)",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/sensor.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 45,\n  \"rawValue\": 2100,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -130,7 +161,7 @@
       "name": "4. Valve State",
       "item": [
         {
-          "name": "Write zone 1 valve — OPEN",
+          "name": "Zone 1 valve — OPEN",
           "event": [
             {
               "listen": "test",
@@ -144,7 +175,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -152,11 +183,11 @@
           }
         },
         {
-          "name": "Write zone 1 valve — CLOSED",
+          "name": "Zone 1 valve — CLOSED",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -164,11 +195,11 @@
           }
         },
         {
-          "name": "Write zone 2 valve — OPEN (schedule)",
+          "name": "Zone 2 valve — OPEN (schedule)",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"schedule\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -176,11 +207,11 @@
           }
         },
         {
-          "name": "Write zone 2 valve — CLOSED",
+          "name": "Zone 2 valve — CLOSED",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"schedule\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -193,29 +224,60 @@
       "name": "5. Command Channel",
       "item": [
         {
-          "name": "Read zone 1 command (device polls this)",
+          "name": "Owner — issue OPEN command zone 1",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Command path readable', () => pm.response.to.have.status(200));",
+                  "pm.test('Command issued', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"OPEN\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Owner — issue CLOSE command zone 1",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"CLOSE\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Device — read zone 1 command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Command readable by device', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "const action = body ? body.action : null;",
-                  "pm.test('Command action is valid or null', () => {",
-                  "  pm.expect(['OPEN','CLOSE', null]).to.include(action);",
-                  "});"
+                  "console.log('Pending command:', body ? body.action : 'none');"
                 ]
               }
             }
           ],
           "request": {
             "method": "GET",
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{id_token}}"
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
           }
         },
         {
-          "name": "Clear zone 1 command (after acting)",
+          "name": "Device — clear zone 1 command (after acting)",
           "event": [
             {
               "listen": "test",
@@ -229,7 +291,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": null\n}"
@@ -237,11 +299,11 @@
           }
         },
         {
-          "name": "Clear zone 2 command (after acting)",
+          "name": "Device — clear zone 2 command (after acting)",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/command.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/command.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": null\n}"
@@ -254,15 +316,15 @@
       "name": "6. Full Device Boot Sequence",
       "item": [
         {
-          "name": "Step 1 — Sign in",
+          "name": "Step 1 — Device sign in",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.idToken) pm.collectionVariables.set('id_token', res.idToken);",
-                  "pm.test('Auth OK', () => pm.expect(res.idToken).to.be.a('string'));"
+                  "if (res.idToken) pm.collectionVariables.set('device_token', res.idToken);",
+                  "pm.test('Device auth OK', () => pm.expect(res.idToken).to.be.a('string'));"
                 ]
               }
             }
@@ -292,7 +354,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firmware\": \"1.0.0\",\n  \"ipAddress\": \"192.168.1.99\",\n  \"wifiRssi\": -58,\n  \"lastSeen\": {\".sv\": \"timestamp\"}\n}"
@@ -300,13 +362,13 @@
           }
         },
         {
-          "name": "Step 3 — Publish initial sensor readings",
+          "name": "Step 3 — Publish zone 1 sensor",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Sensors OK', () => pm.response.to.have.status(200));"
+                  "pm.test('Zone 1 sensor OK', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -314,7 +376,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 62,\n  \"rawValue\": 1840,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -322,32 +384,13 @@
           }
         },
         {
-          "name": "Step 4 — Check for pending command",
+          "name": "Step 4 — Publish zone 2 sensor",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Command poll OK', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "console.log('Pending command:', body ? body.action : 'none');"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{id_token}}"
-          }
-        },
-        {
-          "name": "Step 5 — Confirm valves CLOSED on boot",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Valve init OK', () => pm.response.to.have.status(200));"
+                  "pm.test('Zone 2 sensor OK', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -355,10 +398,188 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{id_token}}",
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/sensor.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moisturePercent\": 45,\n  \"rawValue\": 2100,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 5 — Confirm zone 1 valve CLOSED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone 1 valve init OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 6 — Confirm zone 2 valve CLOSED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone 2 valve init OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"CLOSED\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 7 — Check zone 1 pending command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Command poll OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "console.log('Zone 1 pending command:', body ? body.action : 'none');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Full Command Flow (Owner → Device)",
+      "item": [
+        {
+          "name": "Step 1 — Owner sign in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) pm.collectionVariables.set('owner_token', res.idToken);",
+                  "pm.test('Owner auth OK', () => pm.expect(res.idToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{api_key}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_pass}}\",\n  \"returnSecureToken\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 2 — Owner issues OPEN command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Command issued', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"OPEN\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 3 — Device reads command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Device can read command', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Action is OPEN', () => pm.expect(body.action).to.equal('OPEN'));",
+                  "console.log('Command action:', body ? body.action : 'none');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
+          }
+        },
+        {
+          "name": "Step 4 — Device writes valve OPEN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Valve opened', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 5 — Device clears command",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Command cleared', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": null\n}"
             }
           }
         }

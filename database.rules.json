@@ -1,7 +1,18 @@
 {
   "rules": {
     // -----------------------------------------------------------------------
-    // Existing iot2025 data — owner only
+    // Owner UIDs
+    //   sKRHXxHf9cgzna8ce9UMdFvHZVZ2  — nguyenvanthanh2210@gmail.com (personal)
+    //   BUqnab10ASdHkwAM3HOezLIq6qe2  — owner-irrigation@app.local (test account)
+    // Device UID
+    //   2GVAabgRrafbeBkfpeagzYnnU9w2  — esp32-irrigation@device.local
+    // -----------------------------------------------------------------------
+
+    // Helper: true if the caller is any owner account
+    // (Firebase rules don't support functions, so inline the check everywhere)
+
+    // -----------------------------------------------------------------------
+    // Existing iot2025 data — personal owner only
     // -----------------------------------------------------------------------
     "iot2025": {
       ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
@@ -13,10 +24,10 @@
     // -----------------------------------------------------------------------
     "irrigation": {
 
-      // Device heartbeat — ESP32 writes only, owner reads
+      // Device heartbeat — ESP32 writes, any owner reads
       "devices": {
         "$device_id": {
-          ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+          ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
           ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
         }
       },
@@ -24,40 +35,42 @@
       "zones": {
         "$zone_id": {
 
-          // Zone metadata — owner reads and writes
+          // Zone metadata — any owner reads and writes
           "meta": {
-            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
-            ".write": "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'"
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Sensor data — ESP32 writes, owner reads
+          // Sensor data — ESP32 writes, any owner reads
           "sensor": {
-            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
             ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
           },
 
-          // Valve state — ESP32 writes, owner reads
+          // Valve state — ESP32 writes, any owner reads
           "valve": {
-            ".read":  "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
             ".write": "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'"
           },
 
-          // Command — owner writes (issues commands), ESP32 reads and clears
+          // Command — any owner writes, ESP32 reads and clears
           "command": {
             ".read":  "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'",
             ".write": "auth != null && (
               auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
+              auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' ||
               auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
             )"
           },
 
-          // Schedule — owner reads and writes, ESP32 reads
+          // Schedule — any owner reads and writes, ESP32 reads
           "schedule": {
             ".read":  "auth != null && (
               auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
+              auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' ||
               auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
             )",
-            ".write": "auth != null && auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2'"
+            ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           }
         }
       }
