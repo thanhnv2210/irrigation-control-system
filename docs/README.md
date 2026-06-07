@@ -20,6 +20,9 @@ Install Arduino IDE 2.x, add ESP32 board support, install FirebaseESP32 library,
 ### 4. [Flashing on Windows](flashing-windows.md)
 Windows-specific guide for flashing the ESP32 — USB driver installation and COM port setup.
 
+### 5. [Postman Device Simulator](postman-simulator.md)
+How to use the Postman collection to simulate ESP32 behavior against Firebase while waiting for hardware. Covers all test scenarios — boot sequence, manual valve control, schedule trigger, dry soil alert.
+
 ---
 
 ## Quick Reference
@@ -35,6 +38,8 @@ Windows-specific guide for flashing the ESP32 — USB driver installation and CO
 | Upload failing / BOOT button | [arduino-ide-setup.md](arduino-ide-setup.md#if-upload-hangs-at-connecting) |
 | First boot WiFi setup | [arduino-ide-setup.md](arduino-ide-setup.md#10-first-boot--wifi-provisioning) |
 | Flashing from Windows | [flashing-windows.md](flashing-windows.md) |
+| Simulating device with Postman | [postman-simulator.md](postman-simulator.md) |
+| Test scenarios (valve, schedule, dry soil) | [postman-simulator.md](postman-simulator.md#common-test-scenarios) |
 
 ---
 
