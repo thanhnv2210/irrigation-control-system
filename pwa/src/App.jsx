@@ -7,12 +7,14 @@ import Statistics from './views/Statistics'
 import Simulator  from './views/Simulator'
 import Alerts     from './views/Alerts'
 import AuditLog   from './views/AuditLog'
+import MapView    from './views/MapView'
 import { useAlertMonitor } from './hooks/useAlertMonitor'
 
 const TABS = [
   { id: 'dashboard',  label: 'Dash'    },
   { id: 'control',    label: 'Control' },
   { id: 'schedule',   label: 'Sched'   },
+  { id: 'map',        label: 'Map'     },
   { id: 'statistics', label: 'Stats'   },
   { id: 'alerts',     label: 'Alerts'  },
   { id: 'auditlog',   label: 'Log'     },
@@ -106,6 +108,7 @@ export default function App() {
         {tab === 'control'    && <Control />}
         {tab === 'schedule'   && <Schedule />}
         {tab === 'statistics' && <Statistics />}
+        {tab === 'map'        && <MapView />}
         {tab === 'alerts'     && <Alerts />}
         {tab === 'auditlog'   && <AuditLog />}
         {tab === 'simulator'  && <Simulator />}
