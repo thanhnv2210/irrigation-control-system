@@ -1,0 +1,130 @@
+@startuml Device Onboarding Flow
+!theme plain
+skinparam backgroundColor #0f1f15
+skinparam defaultFontColor #e0f0e8
+skinparam defaultFontSize 13
+
+skinparam participant {
+  BackgroundColor #1e2d24
+  BorderColor #3a5a45
+  FontColor #e0f0e8
+}
+skinparam sequence {
+  ArrowColor #1a7f4b
+  LifeLineBorderColor #3a5a45
+  LifeLineBackgroundColor #162a1e
+  DividerBackgroundColor #1e2d24
+  DividerBorderColor #3a5a45
+  DividerFontColor #a0c8b0
+  GroupBorderColor #3a5a45
+  GroupBackgroundColor #162a1e
+  GroupFontColor #a0c8b0
+  NoteBackgroundColor #1e2d24
+  NoteBorderColor #3a5a45
+  NoteFontColor #7aab90
+}
+skinparam shadowing false
+
+title Device Onboarding — New Site (e.g. "Home 1")
+
+actor       "Owner"       as User   #1a7f4b
+participant "PWA\n(React)" as PWA   #1e2d24
+participant "Firebase\nRTDB"        as FB    #2a3d5a
+participant "ESP32\nFirmware"       as ESP   #2e1e0f
+
+== Step 1 — Create Site in PWA ==
+
+User  -> PWA : Tap "+ Site", enter name "Home 1"
+PWA   -> FB  : push( irrigation/sites ) → new site key
+FB   --> PWA : site key returned (e.g. -OAbc123)
+PWA   -> PWA : setSiteId( -OAbc123 )\nstored in localStorage
+
+note over PWA
+  Dashboard, Control, Schedule, Map
+  all switch to the new empty site.
+  Zones list = [] until device is added.
+end note
+
+== Step 2 — Flash ESP32 Firmware ==
+
+User  -> ESP  : Open Arduino IDE,\nflash irrigation_main.ino\nwith config.h pointing to this Firebase project
+note over ESP
+  config.h must contain:
+  • FIREBASE_API_KEY
+  • FIREBASE_EMAIL / PASSWORD
+  • FIREBASE_DB_URL
+  • ZONE_1_ID = "zone-a"
+  • ZONE_2_ID = "zone-b"  (or any IDs)
+end note
+
+== Step 3 — WiFi Provisioning (Captive Portal) ==
+
+ESP   -> ESP  : Boot — no WiFi creds in Preferences flash
+ESP   -> ESP  : Start AP mode\nSSID: ESP32_Config\nPW:   123456789
+
+User  -> ESP  : Phone connects to "ESP32_Config" AP
+User  -> ESP  : Browser opens 192.168.4.1\nEnters home WiFi SSID + password
+ESP   -> ESP  : Save SSID + password to Preferences (flash)
+ESP   -> ESP  : Reboot
+
+note over ESP
+  On all future boots, creds are read from
+  flash — provisioning page never shown again
+  unless flash is cleared.
+end note
+
+== Step 4 — Device Connects to Firebase ==
+
+ESP   -> ESP  : Read creds from Preferences,\nWiFi.begin( SSID, password )
+ESP   -> FB   : Firebase.begin( config )\nAuthenticate with email/password
+FB   --> ESP  : Auth token granted
+ESP   -> FB   : Write devices/esp32-01\n{ firmware, ipAddress, wifiRssi, lastSeen }
+
+note over FB
+  Device heartbeat path:
+  irrigation/sites/{siteId}/devices/esp32-01/lastSeen
+end note
+
+== Step 5 — Zone Bootstrap (first publish) ==
+
+ESP   -> FB   : set  zones/{zone-a}/meta\n{ name:"Zone A", enabled:true }
+ESP   -> FB   : set  zones/{zone-b}/meta\n{ name:"Zone B", enabled:true }
+ESP   -> FB   : set  zones/{zone-a}/sensor\n{ moisturePercent, rawValue, timestamp }
+ESP   -> FB   : push zones/{zone-a}/history  ← first reading
+ESP   -> FB   : set  zones/{zone-b}/sensor   ← same for zone B
+ESP   -> FB   : push zones/{zone-b}/history
+
+FB   --> PWA  : onValue() fires — zones list updates
+PWA  --> User : Dashboard shows Zone A & Zone B cards\nDevice status bar → ONLINE
+
+== Step 6 — Pin Zones on Map ==
+
+User  -> PWA  : Open Map tab → tap "+ Pin Zone A"
+User  -> PWA  : Tap garden position on SVG map
+PWA   -> FB   : set  zones/{zone-a}/meta\n{ ...existing, px:45, py:30 }
+User  -> PWA  : Tap "+ Pin Zone B", tap another position
+PWA   -> FB   : set  zones/{zone-b}/meta\n{ ...existing, px:55, py:70 }
+
+note over PWA
+  Pins are colour-coded by live moisture.
+  Blue pulse ring = valve currently OPEN.
+end note
+
+== Step 7 — Configure Alerts & Schedule ==
+
+User  -> PWA  : Alerts tab → enter Telegram Bot Token + Chat ID → Save
+PWA   -> FB   : set  settings/alerts\n{ telegram, zones: { threshold, enabled }, offlineMinutes }
+
+User  -> PWA  : Schedule tab → add 06:00 / 18:00 entries per zone
+PWA   -> FB   : push zones/{zone-a}/schedule/{ hour, minute, durationMinutes, days, enabled }
+PWA   -> FB   : push zones/{zone-b}/schedule/{ ... }
+ESP   -> FB   : onValue() on schedule — loads entries on next tick
+
+note over User, ESP
+  Onboarding complete.
+  ESP32 now autonomously reads sensors every 30 s,
+  follows schedule, and reacts to manual valve commands.
+  Valve safety cutoff: 10 min regardless of any command.
+end note
+
+@enduml

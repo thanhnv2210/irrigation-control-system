@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Irrigation — Device Simulator",
-    "description": "Simulates ESP32 firmware behavior against Firebase RTDB.\n\nAccounts:\n- Owner (test): owner-irrigation@app.local / IrrigationOwner2026!\n- ESP32 device: esp32-irrigation@device.local / KqEodVoVeUx8JD6qchDrtw==\n\nRun order:\n1. Auth — sign in as device OR owner\n2. Heartbeat — device comes online\n3. Sensor publish — moisture readings\n4. Valve state — write OPEN/CLOSED\n5. Command channel — issue (owner) and clear (device)\n6. Full boot sequence — all steps in order",
+    "description": "Simulates ESP32 firmware behavior against Firebase RTDB.\n\nAccounts:\n- Owner (test): owner-irrigation@app.local / IrrigationOwner2026!\n- ESP32 device: esp32-irrigation@device.local / KqEodVoVeUx8JD6qchDrtw==\n\nMulti-site schema: all paths are scoped to irrigation/sites/{{site_id}}/...\nSet site_id to the Firebase push key of the site you want to target.\n\nRun order:\n1. Auth — sign in as device OR owner\n2. Heartbeat — device comes online\n3. Sensor publish — moisture readings\n4. Valve state — write OPEN/CLOSED\n5. Command channel — issue (owner) and clear (device)\n6. Full Boot Sequence — all device steps in order\n7. Full Command Flow (Owner → Device)\n8. New Device Onboarding — Home 1 (step-by-step new site setup)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,8 @@
     { "key": "owner_pass",   "value": "IrrigationOwner2026!" },
     { "key": "device_token", "value": "" },
     { "key": "owner_token",  "value": "" },
+    { "key": "site_id",      "value": "default",  "description": "Target site key — change to any push key from irrigation/sites/" },
+    { "key": "new_site_id",  "value": "",          "description": "Filled automatically by the 'Create site' step in folder 8" },
     { "key": "zone1",        "value": "balcony" },
     { "key": "zone2",        "value": "garden" },
     { "key": "device_id",    "value": "esp32-01" }
@@ -97,7 +99,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/devices/{{device_id}}.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firmware\": \"1.0.0\",\n  \"ipAddress\": \"192.168.1.99\",\n  \"wifiRssi\": -58,\n  \"lastSeen\": {\".sv\": \"timestamp\"}\n}"
@@ -124,7 +126,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 62,\n  \"rawValue\": 1840,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -136,7 +138,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 22,\n  \"rawValue\": 3000,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -148,7 +150,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/sensor.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 45,\n  \"rawValue\": 2100,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -175,7 +177,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -187,7 +189,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -199,7 +201,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"schedule\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -211,7 +213,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"schedule\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -238,7 +240,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{owner_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": \"OPEN\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -250,7 +252,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{owner_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": \"CLOSE\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -273,7 +275,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{device_token}}"
           }
         },
         {
@@ -291,7 +293,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": null\n}"
@@ -303,7 +305,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/command.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/command.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": null\n}"
@@ -354,7 +356,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/devices/{{device_id}}.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/devices/{{device_id}}.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firmware\": \"1.0.0\",\n  \"ipAddress\": \"192.168.1.99\",\n  \"wifiRssi\": -58,\n  \"lastSeen\": {\".sv\": \"timestamp\"}\n}"
@@ -376,7 +378,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/sensor.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 62,\n  \"rawValue\": 1840,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -398,7 +400,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/sensor.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/sensor.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"moisturePercent\": 45,\n  \"rawValue\": 2100,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
@@ -420,7 +422,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -442,7 +444,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone2}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone2}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"CLOSED\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -465,7 +467,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{device_token}}"
           }
         }
       ]
@@ -512,7 +514,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{owner_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{owner_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": \"OPEN\",\n  \"issuedBy\": \"app\",\n  \"issuedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -536,7 +538,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}"
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{device_token}}"
           }
         },
         {
@@ -554,7 +556,7 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/valve.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/valve.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"state\": \"OPEN\",\n  \"openedBy\": \"manual\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
@@ -576,11 +578,350 @@
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{db_url}}/irrigation/zones/{{zone1}}/command.json?auth={{device_token}}",
+            "url": "{{db_url}}/irrigation/sites/{{site_id}}/zones/{{zone1}}/command.json?auth={{device_token}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": null\n}"
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. New Device Onboarding — Home 1",
+      "description": "Complete step-by-step simulation of onboarding a fresh ESP32 device to a brand-new site.\n\nRun each request IN ORDER. The 'Create site' step captures the new push key into {{new_site_id}} automatically.\n\nAfter completing this folder the PWA will show:\n- 'Home 1' in the site switcher\n- Two zone cards (zone-a, zone-b) with live moisture\n- Device status bar → ONLINE",
+      "item": [
+        {
+          "name": "Step 1 — Owner signs in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.collectionVariables.set('owner_token', res.idToken);",
+                  "  pm.test('Owner auth OK', () => pm.expect(res.idToken).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Auth failed', () => pm.expect.fail(JSON.stringify(res)));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{api_key}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_pass}}\",\n  \"returnSecureToken\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 2 — Create new site 'Home 1'",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Site created', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "// Firebase REST POST returns { name: '-OAbc...' } — the new push key",
+                  "if (res.name) {",
+                  "  pm.collectionVariables.set('new_site_id', res.name);",
+                  "  console.log('New site ID:', res.name);",
+                  "  pm.test('Site ID captured', () => pm.expect(res.name).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Site ID missing', () => pm.expect.fail(JSON.stringify(res)));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"meta\": {\n    \"name\": \"Home 1\",\n    \"createdAt\": {\".sv\": \"timestamp\"}\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 3 — Bootstrap zone-a meta (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-a meta written', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-a/meta.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Zone A\",\n  \"enabled\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 4 — Bootstrap zone-b meta (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-b meta written', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-b/meta.json?auth={{owner_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Zone B\",\n  \"enabled\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 5 — Device signs in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.collectionVariables.set('device_token', res.idToken);",
+                  "  pm.test('Device auth OK', () => pm.expect(res.idToken).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Auth failed', () => pm.expect.fail(JSON.stringify(res)));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{api_key}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{device_email}}\",\n  \"password\": \"{{device_pass}}\",\n  \"returnSecureToken\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 6 — Device publishes first heartbeat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Heartbeat OK', () => pm.response.to.have.status(200));",
+                  "console.log('Device is now visible as ONLINE in the PWA Dashboard.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/devices/esp32-01.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firmware\": \"1.0.0\",\n  \"ipAddress\": \"192.168.1.50\",\n  \"wifiRssi\": -52,\n  \"lastSeen\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 7 — Device initialises zone-a valve CLOSED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-a valve init OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-a/valve.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"auto\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 8 — Device initialises zone-b valve CLOSED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-b valve init OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-b/valve.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"CLOSED\",\n  \"openedBy\": \"auto\",\n  \"lastChangedAt\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 9 — Device publishes zone-a first sensor reading",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-a sensor OK', () => pm.response.to.have.status(200));",
+                  "console.log('PWA Dashboard zone-a gauge should update now.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-a/sensor.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moisturePercent\": 58,\n  \"rawValue\": 1900,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 10 — Device publishes zone-b first sensor reading",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-b sensor OK', () => pm.response.to.have.status(200));",
+                  "console.log('PWA Dashboard zone-b gauge should update now.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-b/sensor.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moisturePercent\": 41,\n  \"rawValue\": 2180,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 11 — Device pushes zone-a first history entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-a history entry OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-a/history.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moisturePercent\": 58,\n  \"rawValue\": 1900,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 12 — Device pushes zone-b first history entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Zone-b history entry OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-b/history.json?auth={{device_token}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moisturePercent\": 41,\n  \"rawValue\": 2180,\n  \"timestamp\": {\".sv\": \"timestamp\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 13 — Device checks for pending commands (zone-a)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Command poll OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const action = body ? body.action : null;",
+                  "pm.test('No pending command on fresh site', () => pm.expect(action).to.be.null);",
+                  "console.log('Zone-a command:', action ?? 'none — safe to proceed');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}/zones/zone-a/command.json?auth={{device_token}}"
+          }
+        },
+        {
+          "name": "Step 14 — Verify site structure (owner read)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Site readable by owner', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Site has meta', () => pm.expect(body).to.have.property('meta'));",
+                  "pm.test('Site has zones', () => pm.expect(body).to.have.property('zones'));",
+                  "pm.test('Site has devices', () => pm.expect(body).to.have.property('devices'));",
+                  "console.log('Site name:', body.meta?.name);",
+                  "console.log('Zones:', Object.keys(body.zones || {}));",
+                  "console.log('Onboarding complete — open the PWA and switch to this site.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{db_url}}/irrigation/sites/{{new_site_id}}.json?auth={{owner_token}}"
           }
         }
       ]
