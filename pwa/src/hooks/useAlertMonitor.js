@@ -28,6 +28,7 @@ export function useAlertMonitor() {
   const balcony = useZoneData('balcony')
   const garden  = useZoneData('garden')
   const device  = useDeviceData('esp32-01')
+  const deviceName = device?.name || 'esp32-01'
 
   const settingsRef     = useRef(null)
   const lastSeenRef     = useRef(null)
@@ -92,12 +93,12 @@ export function useAlertMonitor() {
         if (Date.now() - getLastAlert(`${siteId}_device`) > COOLDOWN_MS) {
           const mins = Math.round((Date.now() - lastSeen) / 60000)
           sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
-            `🔴 <b>Device Offline</b>\n\n<b>esp32-01</b> has not reported in <b>${mins} min</b>.\nTime: ${new Date().toLocaleString()}\n\nCheck WiFi connection or power supply.`)
+            `🔴 <b>Device Offline</b>\n\n<b>${deviceName}</b> has not reported in <b>${mins} min</b>.\nTime: ${new Date().toLocaleString()}\n\nCheck WiFi connection or power supply.`)
           setLastAlert(`${siteId}_device`)
         }
       } else if (isOnline && wasOnline === false) {
         sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
-          `🟢 <b>Device Back Online</b>\n\n<b>esp32-01</b> reconnected successfully.\nTime: ${new Date().toLocaleString()}`)
+          `🟢 <b>Device Back Online</b>\n\n<b>${deviceName}</b> reconnected successfully.\nTime: ${new Date().toLocaleString()}`)
         clearLastAlert(`${siteId}_device`)
       }
       deviceWasOnline.current = isOnline

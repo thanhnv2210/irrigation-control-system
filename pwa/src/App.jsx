@@ -67,9 +67,11 @@ function AlertMonitor() {
 
 // Site switcher shown in the header
 function SiteSwitcher() {
-  const { siteId, setSiteId, sites, createSite, deleteSite } = useSite()
-  const [creating, setCreating] = useState(false)
-  const [newName,  setNewName]  = useState('')
+  const { siteId, setSiteId, sites, createSite, renameSite, deleteSite } = useSite()
+  const [creating,  setCreating]  = useState(false)
+  const [renaming,  setRenaming]  = useState(false)
+  const [newName,   setNewName]   = useState('')
+  const [editName,  setEditName]  = useState('')
 
   const siteList = Object.entries(sites)
 
@@ -81,19 +83,37 @@ function SiteSwitcher() {
     setCreating(false)
   }
 
+  function startRename() {
+    setEditName(sites[siteId]?.meta?.name || siteId)
+    setRenaming(true)
+  }
+
+  async function handleRename(e) {
+    e.preventDefault()
+    if (!editName.trim()) return
+    await renameSite(siteId, editName.trim())
+    setRenaming(false)
+  }
+
   async function handleDelete() {
     const name = sites[siteId]?.meta?.name || siteId
     if (!confirm(`Delete "${name}"? This removes all its data permanently.`)) return
     await deleteSite(siteId)
   }
 
-  if (siteList.length <= 1 && !creating) {
-    const currentName = sites[siteId]?.meta?.name || siteId
+  if (renaming) {
     return (
-      <div style={styles.siteRow}>
-        <span style={styles.siteName}>{currentName}</span>
-        <button style={styles.siteAddBtn} onClick={() => setCreating(true)}>+ Site</button>
-      </div>
+      <form onSubmit={handleRename} style={styles.siteRow}>
+        <input
+          autoFocus
+          style={styles.siteInput}
+          value={editName}
+          onChange={e => setEditName(e.target.value)}
+          onKeyDown={e => e.key === 'Escape' && setRenaming(false)}
+        />
+        <button style={styles.siteAddBtn} type="submit">✓</button>
+        <button style={styles.siteCancelBtn} type="button" onClick={() => setRenaming(false)}>✕</button>
+      </form>
     )
   }
 
@@ -106,10 +126,22 @@ function SiteSwitcher() {
           placeholder="Site name…"
           value={newName}
           onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === 'Escape' && setCreating(false)}
         />
         <button style={styles.siteAddBtn} type="submit">Add</button>
         <button style={styles.siteCancelBtn} type="button" onClick={() => setCreating(false)}>✕</button>
       </form>
+    )
+  }
+
+  if (siteList.length <= 1) {
+    const currentName = sites[siteId]?.meta?.name || siteId
+    return (
+      <div style={styles.siteRow}>
+        <span style={styles.siteName}>{currentName}</span>
+        <button style={styles.siteIconBtn} onClick={startRename} title="Rename site">✎</button>
+        <button style={styles.siteAddBtn} onClick={() => setCreating(true)}>+ Site</button>
+      </div>
     )
   }
 
@@ -124,6 +156,7 @@ function SiteSwitcher() {
           <option key={id} value={id}>{s?.meta?.name || id}</option>
         ))}
       </select>
+      <button style={styles.siteIconBtn} onClick={startRename} title="Rename site">✎</button>
       <button style={styles.siteAddBtn} onClick={() => setCreating(true)}>+ Site</button>
       <button style={styles.siteDeleteBtn} onClick={handleDelete} title="Delete this site">🗑</button>
     </div>
@@ -192,6 +225,7 @@ const styles = {
   siteInput:     { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.8rem', padding: '0.3rem 0.5rem', flex: 1, outline: 'none' },
   siteAddBtn:    { background: '#1a7f4b', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.75rem', padding: '0.3rem 0.6rem', cursor: 'pointer', flexShrink: 0 },
   siteCancelBtn: { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.75rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
+  siteIconBtn:   { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.8rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
   siteDeleteBtn: { background: 'transparent', border: '1px solid #e05c3a', borderRadius: '6px', color: '#e05c3a', fontSize: '0.75rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
   main:          { flex: 1, overflowY: 'auto' },
   nav:           { display: 'flex', borderTop: '1px solid #1e2d24', flexShrink: 0 },

@@ -58,6 +58,14 @@ export function SiteProvider({ children }) {
     await set(ref(db, `irrigation/sites/${id}/meta/name`), name)
   }
 
+  async function renameZone(zoneId, name) {
+    await set(ref(db, `irrigation/sites/${siteId}/zones/${zoneId}/meta/name`), name)
+  }
+
+  async function renameDevice(deviceId, name) {
+    await set(ref(db, `irrigation/sites/${siteId}/devices/${deviceId}/name`), name)
+  }
+
   async function deleteSite(id) {
     await remove(ref(db, `irrigation/sites/${id}`))
     // If we deleted the active site, fall back to default (or first remaining)
@@ -68,7 +76,7 @@ export function SiteProvider({ children }) {
   }
 
   return (
-    <SiteContext.Provider value={{ siteId, setSiteId, sitePath, sites, zones, createSite, renameSite, deleteSite }}>
+    <SiteContext.Provider value={{ siteId, setSiteId, sitePath, sites, zones, createSite, renameSite, deleteSite, renameZone, renameDevice }}>
       {children}
     </SiteContext.Provider>
   )
