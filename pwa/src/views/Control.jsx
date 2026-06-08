@@ -4,6 +4,7 @@ import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { logAudit } from '../utils/audit'
+import { useSite } from '../context/SiteContext'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -12,19 +13,19 @@ const ZONES = [
 
 function ZoneControl({ zoneId, label }) {
   const { valve, command } = useZoneData(zoneId)
-  const [pending, setPending] = useState(null)  // { action: 'OPEN' | 'CLOSE' }
+  const { sitePath } = useSite()
+  const [pending, setPending] = useState(null)
 
   const isOpen     = valve?.state === 'OPEN'
   const hasPending = command?.action && command.action !== 'null'
 
   async function sendCommand(action) {
-    const cmdRef = ref(db, `irrigation/zones/${zoneId}/command`)
-    await set(cmdRef, {
+    await set(ref(db, sitePath(`zones/${zoneId}/command`)), {
       action,
       issuedAt: serverTimestamp(),
       issuedBy: 'app'
     })
-    logAudit('VALVE_COMMAND', zoneId, { action })
+    logAudit(sitePath, 'VALVE_COMMAND', zoneId, { action })
   }
 
   function handlePress(action) {

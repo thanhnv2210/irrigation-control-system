@@ -3,6 +3,7 @@ import { ref, set, push, get, update } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
+import { useSite } from '../context/SiteContext'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -27,6 +28,10 @@ function nextMoisture(current, valveOpen) {
 // Device sensor simulator — runs a JS interval to push readings
 // ---------------------------------------------------------------------------
 function DeviceSimulator() {
+  const { sitePath } = useSite()
+  const sitePathRef = useRef(sitePath)
+  useEffect(() => { sitePathRef.current = sitePath }, [sitePath])
+
   const [running,   setRunning]  = useState(false)
   const [interval,  setInterval_] = useState(INTERVALS[0])
   const [log,       setLog]      = useState([])
@@ -46,6 +51,7 @@ function DeviceSimulator() {
   }
 
   async function tick() {
+    const sp = sitePathRef.current
     const { moisture: m, valveOpen: v } = stateRef.current
     const newMoisture = {}
 
@@ -56,23 +62,20 @@ function DeviceSimulator() {
 
       const sensorData = { moisturePercent: pct, rawValue: raw, timestamp: Date.now() }
 
-      // Write current sensor
-      await set(ref(db, `irrigation/zones/${zone.id}/sensor`), sensorData)
-      // Push to history
-      await push(ref(db, `irrigation/zones/${zone.id}/history`), sensorData)
+      await set(ref(db, sp(`zones/${zone.id}/sensor`)), sensorData)
+      await push(ref(db, sp(`zones/${zone.id}/history`)), sensorData)
 
-      // Check for pending command and act on it
-      const cmdSnap = await get(ref(db, `irrigation/zones/${zone.id}/command`))
+      const cmdSnap = await get(ref(db, sp(`zones/${zone.id}/command`)))
       const cmd = cmdSnap.val()
 
       if (cmd?.action === 'OPEN') {
-        await set(ref(db, `irrigation/zones/${zone.id}/valve`), { state: 'OPEN', openedBy: 'manual', lastChangedAt: Date.now() })
-        await set(ref(db, `irrigation/zones/${zone.id}/command/action`), null)
+        await set(ref(db, sp(`zones/${zone.id}/valve`)), { state: 'OPEN', openedBy: 'manual', lastChangedAt: Date.now() })
+        await set(ref(db, sp(`zones/${zone.id}/command/action`)), null)
         setValveOpen(prev => ({ ...prev, [zone.id]: true }))
         addLog(`${zone.label}: command OPEN → valve opened, command cleared`)
       } else if (cmd?.action === 'CLOSE') {
-        await set(ref(db, `irrigation/zones/${zone.id}/valve`), { state: 'CLOSED', openedBy: 'manual', lastChangedAt: Date.now() })
-        await set(ref(db, `irrigation/zones/${zone.id}/command/action`), null)
+        await set(ref(db, sp(`zones/${zone.id}/valve`)), { state: 'CLOSED', openedBy: 'manual', lastChangedAt: Date.now() })
+        await set(ref(db, sp(`zones/${zone.id}/command/action`)), null)
         setValveOpen(prev => ({ ...prev, [zone.id]: false }))
         addLog(`${zone.label}: command CLOSE → valve closed, command cleared`)
       }
@@ -80,8 +83,7 @@ function DeviceSimulator() {
       addLog(`${zone.label}: moisture ${pct}% (raw ${raw})${v[zone.id] ? ' 💧 valve open' : ''}`)
     }
 
-    // Heartbeat
-    await set(ref(db, 'irrigation/devices/esp32-01'), {
+    await set(ref(db, sp('devices/esp32-01')), {
       firmware: '1.0.0-sim',
       ipAddress: '127.0.0.1',
       wifiRssi: -45,
@@ -149,6 +151,7 @@ function DeviceSimulator() {
 // Ad-hoc zone actions — simulate device acting on a valve directly
 // ---------------------------------------------------------------------------
 function AdHocActions() {
+  const { sitePath } = useSite()
   const [log, setLog] = useState([])
 
   function addLog(msg) {
@@ -157,20 +160,18 @@ function AdHocActions() {
   }
 
   async function setValve(zoneId, label, state) {
-    await set(ref(db, `irrigation/zones/${zoneId}/valve`), {
-      state,
-      openedBy: 'manual',
-      lastChangedAt: Date.now()
+    await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
+      state, openedBy: 'manual', lastChangedAt: Date.now()
     })
-    await set(ref(db, `irrigation/zones/${zoneId}/command/action`), null)
+    await set(ref(db, sitePath(`zones/${zoneId}/command/action`)), null)
     addLog(`${label}: valve set to ${state}, command cleared`)
   }
 
   async function publishSensor(zoneId, label, pct) {
     const raw = Math.round(3200 - (pct / 100) * 2000)
     const data = { moisturePercent: pct, rawValue: raw, timestamp: Date.now() }
-    await set(ref(db, `irrigation/zones/${zoneId}/sensor`), data)
-    await push(ref(db, `irrigation/zones/${zoneId}/history`), data)
+    await set(ref(db, sitePath(`zones/${zoneId}/sensor`)), data)
+    await push(ref(db, sitePath(`zones/${zoneId}/history`)), data)
     addLog(`${label}: published moisture ${pct}%`)
   }
 
@@ -213,18 +214,19 @@ function ScheduleTrigger() {
 
   function ZoneTrigger({ zoneId, label }) {
     const { schedule, valve } = useZoneData(zoneId)
+    const { sitePath } = useSite()
     const entries = Object.entries(schedule || {})
 
     async function fire(scheduleId, entry) {
       const durationMs = entry.durationMinutes * 60 * 1000
-      await set(ref(db, `irrigation/zones/${zoneId}/valve`), {
+      await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
         state: 'OPEN', openedBy: 'schedule', lastChangedAt: Date.now()
       })
-      logAudit('SCHEDULE_FIRED', zoneId, { scheduleId, hour: entry.hour, minute: entry.minute, durationMinutes: entry.durationMinutes })
+      logAudit(sitePath, 'SCHEDULE_FIRED', zoneId, { scheduleId, hour: entry.hour, minute: entry.minute, durationMinutes: entry.durationMinutes })
       addLog(`${label}: schedule fired "${entry.hour}:${String(entry.minute).padStart(2,'0')}" — valve OPEN for ${entry.durationMinutes} min`)
 
       setTimeout(async () => {
-        await set(ref(db, `irrigation/zones/${zoneId}/valve`), {
+        await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
           state: 'CLOSED', openedBy: 'schedule', lastChangedAt: Date.now()
         })
         addLog(`${label}: schedule duration elapsed — valve CLOSED`)
@@ -291,6 +293,7 @@ const ZONE_START = { balcony: 60, garden: 57 }
 const WATERING_TICKS = new Set([36, 108])  // 06:00 = tick 36, 18:00 = tick 108
 
 function DataSeeder() {
+  const { sitePath } = useSite()
   const [seedDate, setSeedDate]   = useState(todayStr)
   const [seeding,  setSeeding]    = useState(false)
   const [log,      setLog]        = useState([])
@@ -304,7 +307,7 @@ function DataSeeder() {
     setSeeding(true)
     const [yr, mo, dy] = seedDate.split('-').map(Number)
     const dayStart = new Date(yr, mo - 1, dy, 0, 0, 0, 0).getTime()
-    const TICK_MS  = 10 * 60 * 1000   // 10 min per tick
+    const TICK_MS  = 10 * 60 * 1000
 
     const updates = {}
     let seqN = 0
@@ -327,7 +330,7 @@ function DataSeeder() {
         const key   = `-seed${ts.toString(36)}${(seqN++).toString(36)}`
         const entry = { moisturePercent: pct, rawValue: raw, timestamp: ts, valveOpen: isWatering }
 
-        updates[`irrigation/zones/${zone.id}/history/${key}`] = entry
+        updates[sitePath(`zones/${zone.id}/history/${key}`)] = entry
       }
     }
 

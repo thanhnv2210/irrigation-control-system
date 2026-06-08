@@ -8,9 +8,6 @@
     //   2GVAabgRrafbeBkfpeagzYnnU9w2  — esp32-irrigation@device.local
     // -----------------------------------------------------------------------
 
-    // Helper: true if the caller is any owner account
-    // (Firebase rules don't support functions, so inline the check everywhere)
-
     // -----------------------------------------------------------------------
     // Existing iot2025 data — personal owner only
     // -----------------------------------------------------------------------
@@ -20,79 +17,80 @@
     },
 
     // -----------------------------------------------------------------------
-    // Irrigation system
+    // Irrigation system — multi-site structure
     // -----------------------------------------------------------------------
     "irrigation": {
 
-      // Device heartbeat — ESP32 or owner writes (owner needed for simulator)
-      "devices": {
-        "$device_id": {
+      // Site list — any owner can read and create sites
+      "sites": {
+        ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+        "$site_id": {
           ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-          ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-        }
-      },
+          ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
-      "zones": {
-        "$zone_id": {
-
-          // Zone metadata — any owner reads and writes
+          // Site metadata (name, etc.) — any owner reads/writes
           "meta": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Sensor data — ESP32 or owner writes (owner needed for simulator)
-          "sensor": {
-            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+          // Device heartbeat — ESP32 or owner writes
+          "devices": {
+            "$device_id": {
+              ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+              ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+            }
           },
 
-          // Sensor history — ESP32 pushes entries, any owner reads
-          "history": {
+          "zones": {
+            "$zone_id": {
+
+              "meta": {
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+              },
+
+              "sensor": {
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+              },
+
+              "history": {
+                ".indexOn": ["timestamp"],
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+              },
+
+              "valve": {
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+              },
+
+              "command": {
+                ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
+              },
+
+              "schedule": {
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')",
+                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+              }
+            }
+          },
+
+          // Audit log — per site
+          "auditLog": {
             ".indexOn": ["timestamp"],
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+            ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Valve state — ESP32 or owner writes (owner needed for simulator)
-          "valve": {
+          // Settings (alerts, Telegram) — per site
+          "settings": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-            ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-          },
-
-          // Command — any owner writes, ESP32 reads and clears
-          "command": {
-            ".read":  "auth != null && auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'",
-            ".write": "auth != null && (
-              auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
-              auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' ||
-              auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
-            )"
-          },
-
-          // Schedule — any owner reads and writes, ESP32 reads
-          "schedule": {
-            ".read":  "auth != null && (
-              auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' ||
-              auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' ||
-              auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2'
-            )",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           }
         }
-      },
-
-      // Audit log — any owner reads and writes
-      "auditLog": {
-        ".indexOn": ["timestamp"],
-        ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-        ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-      },
-
-      // App settings (alert thresholds, Telegram config) — any owner reads/writes
-      "settings": {
-        ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-        ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
       }
     },
 

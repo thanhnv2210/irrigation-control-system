@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ref, onValue, set } from 'firebase/database'
 import { db } from '../firebase'
 import { useDeviceData } from '../hooks/useZoneData'
+import { useSite } from '../context/SiteContext'
 
 const ZONES = [
   { id: 'balcony', label: 'Balcony' },
@@ -39,6 +40,7 @@ export default function Alerts() {
   const [saving,         setSaving]         = useState(false)
   const [testStatus,     setTestStatus]     = useState('')
 
+  const { sitePath } = useSite()
   const device = useDeviceData('esp32-01')
   const offlineThresholdMs = offlineMinutes * 60 * 1000
   const isOnline  = device?.lastSeen && Date.now() - device.lastSeen < offlineThresholdMs
@@ -47,7 +49,7 @@ export default function Alerts() {
     : '—'
 
   useEffect(() => {
-    const unsub = onValue(ref(db, 'irrigation/settings/alerts'), snap => {
+    const unsub = onValue(ref(db, sitePath('settings/alerts')), snap => {
       const val = snap.val()
       if (!val) return
       setSettings(val)
@@ -77,7 +79,7 @@ export default function Alerts() {
     for (const z of ZONES) {
       data.zones[z.id] = { threshold: Number(thresholds[z.id]), enabled: enabled[z.id] }
     }
-    await set(ref(db, 'irrigation/settings/alerts'), data)
+    await set(ref(db, sitePath('settings/alerts')), data)
     setSaving(false)
   }
 

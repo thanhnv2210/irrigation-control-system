@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ref, query, orderByChild, limitToLast, onValue } from 'firebase/database'
 import { db } from '../firebase'
+import { useSite } from '../context/SiteContext'
 
 const ACTION_META = {
   VALVE_COMMAND:     { icon: '💧', label: 'Valve Command',     color: '#3a8fd4' },
@@ -46,13 +47,14 @@ function detailSummary(action, details, zone) {
 }
 
 export default function AuditLog() {
+  const { sitePath } = useSite()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState('all')
 
   useEffect(() => {
     const q = query(
-      ref(db, 'irrigation/auditLog'),
+      ref(db, sitePath('auditLog')),
       orderByChild('timestamp'),
       limitToLast(100)
     )
@@ -65,7 +67,7 @@ export default function AuditLog() {
       setLoading(false)
     })
     return unsub
-  }, [])
+  }, [sitePath])
 
   const filterCfg = FILTERS.find(f => f.id === filter)
   const visible = filter === 'all'

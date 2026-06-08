@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ref, onValue, set } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
+import { useSite } from '../context/SiteContext'
 
 // Garden dimensions (metres) — change to match your actual space
 const GARDEN_W = 10
@@ -34,11 +35,12 @@ function svgToPct(sx, sy, svgW, svgH) {
 // ── Zone pin (SVG group) ──────────────────────────────────────────────────
 function ZonePin({ zone, svgW, svgH, onDragStart }) {
   const { sensor, valve } = useZoneData(zone.id)
+  const { sitePath } = useSite()
   const [meta, setMeta]   = useState(null)
 
   useEffect(() => {
-    return onValue(ref(db, `irrigation/zones/${zone.id}/meta`), snap => setMeta(snap.val()))
-  }, [zone.id])
+    return onValue(ref(db, sitePath(`zones/${zone.id}/meta`)), snap => setMeta(snap.val()))
+  }, [zone.id, sitePath])
 
   const pct       = sensor?.moisturePercent ?? null
   const valveOpen = valve?.state === 'OPEN'
@@ -105,25 +107,25 @@ function GridLines({ svgW, svgH }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────
 export default function MapView() {
+  const { sitePath } = useSite()
   const svgRef   = useRef(null)
-  const [placing, setPlacing] = useState(null)   // zone id to place
+  const [placing, setPlacing] = useState(null)
   const [metas,   setMetas]   = useState({})
-  const [dragging, setDragging] = useState(null) // { zoneId, meta }
-  const [tooltip, setTooltip] = useState(null)   // { zoneId, x, y }
+  const [dragging, setDragging] = useState(null)
+  const [tooltip, setTooltip] = useState(null)
 
-  // SVG viewBox — 10:20 aspect. Display width fills container.
-  const PAD   = 20   // padding for axis labels
-  const SVG_W = 200  // internal units (10 m → 200 units = 1m per 20px)
-  const SVG_H = 400  // internal units (20 m → 400 units)
+  const PAD   = 20
+  const SVG_W = 200
+  const SVG_H = 400
 
   useEffect(() => {
     const unsubs = ZONES.map(z =>
-      onValue(ref(db, `irrigation/zones/${z.id}/meta`), snap =>
+      onValue(ref(db, sitePath(`zones/${z.id}/meta`)), snap =>
         setMetas(prev => ({ ...prev, [z.id]: snap.val() }))
       )
     )
     return () => unsubs.forEach(u => u())
-  }, [])
+  }, [sitePath])
 
   // ── Place mode — click on SVG ─────────────────────────────────────────
   function handleSvgClick(e) {
@@ -169,7 +171,7 @@ export default function MapView() {
   async function savePos(zoneId, px, py) {
     const zone     = ZONES.find(z => z.id === zoneId)
     const existing = metas[zoneId] ?? {}
-    await set(ref(db, `irrigation/zones/${zoneId}/meta`), {
+    await set(ref(db, sitePath(`zones/${zoneId}/meta`)), {
       name:    existing.name    || zone.label,
       enabled: existing.enabled !== false,
       ...existing,
