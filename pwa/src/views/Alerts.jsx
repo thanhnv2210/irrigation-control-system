@@ -4,11 +4,6 @@ import { db } from '../firebase'
 import { useDeviceData } from '../hooks/useZoneData'
 import { useSite } from '../context/SiteContext'
 
-const ZONES = [
-  { id: 'balcony', label: 'Balcony' },
-  { id: 'garden',  label: 'Garden'  },
-]
-
 function getLastAlert(zoneId) {
   const v = localStorage.getItem(`irrigAlert_${zoneId}`)
   return v ? new Date(parseInt(v)).toLocaleString() : '—'
@@ -33,14 +28,14 @@ export default function Alerts() {
   const [settings,       setSettings]       = useState(null)
   const [token,          setToken]          = useState('')
   const [chatId,         setChatId]         = useState('')
-  const [thresholds,     setThresholds]     = useState({ balcony: 30, garden: 30 })
-  const [enabled,        setEnabled]        = useState({ balcony: true, garden: true })
+  const [thresholds,     setThresholds]     = useState({})
+  const [enabled,        setEnabled]        = useState({})
   const [offlineMinutes, setOfflineMinutes] = useState(5)
   const [offlineEnabled, setOfflineEnabled] = useState(false)
   const [saving,         setSaving]         = useState(false)
   const [testStatus,     setTestStatus]     = useState('')
 
-  const { sitePath } = useSite()
+  const { sitePath, zones } = useSite()
   const device = useDeviceData('esp32-01')
   const offlineThresholdMs = offlineMinutes * 60 * 1000
   const isOnline  = device?.lastSeen && Date.now() - device.lastSeen < offlineThresholdMs
@@ -58,7 +53,7 @@ export default function Alerts() {
       setOfflineMinutes(val.offlineMinutes ?? 5)
       setOfflineEnabled(val.offlineEnabled ?? false)
       const th = {}, en = {}
-      for (const z of ZONES) {
+      for (const z of zones) {
         th[z.id] = val.zones?.[z.id]?.threshold ?? 30
         en[z.id] = val.zones?.[z.id]?.enabled   !== false
       }
@@ -66,7 +61,7 @@ export default function Alerts() {
       setEnabled(en)
     })
     return unsub
-  }, [])
+  }, [sitePath, zones])
 
   async function save() {
     setSaving(true)
@@ -76,7 +71,7 @@ export default function Alerts() {
       offlineEnabled,
       zones: {}
     }
-    for (const z of ZONES) {
+    for (const z of zones) {
       data.zones[z.id] = { threshold: Number(thresholds[z.id]), enabled: enabled[z.id] }
     }
     await set(ref(db, sitePath('settings/alerts')), data)
@@ -184,7 +179,7 @@ export default function Alerts() {
         <span style={styles.cardTitle}>Alert Thresholds</span>
         <p style={styles.hint}>Send an alert when moisture drops below the threshold. Cooldown: 1 hour per zone.</p>
 
-        {ZONES.map(z => (
+        {zones.map(z => (
           <div key={z.id} style={styles.zoneRow}>
             <div style={styles.zoneHeader}>
               <span style={styles.zoneName}>{z.label}</span>

@@ -5,7 +5,6 @@ import { useZoneData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
 
-const ZONES   = [{ id: 'balcony', label: 'Balcony' }, { id: 'garden', label: 'Garden' }]
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const EMPTY_FORM = { hour: 6, minute: 0, durationMinutes: 10, enabled: true, days: [1,2,3,4,5] }
@@ -131,9 +130,15 @@ function ZoneSchedule({ zoneId, label }) {
 }
 
 export default function Schedule() {
+  const { zones } = useSite()
   return (
     <div style={styles.page}>
-      {ZONES.map(z => <ZoneSchedule key={z.id} zoneId={z.id} label={z.label} />)}
+      {zones.length === 0 && (
+        <p style={{ color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
+          No zones configured for this site.
+        </p>
+      )}
+      {zones.map(z => <ZoneSchedule key={z.id} zoneId={z.id} label={z.label} />)}
     </div>
   )
 }

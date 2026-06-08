@@ -5,11 +5,6 @@ import { useZoneData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
 
-const ZONES = [
-  { id: 'balcony', label: 'Balcony' },
-  { id: 'garden',  label: 'Garden'  }
-]
-
 const INTERVALS = [
   { label: '10s',  ms: 10000   },
   { label: '30s',  ms: 30000   },
@@ -28,17 +23,19 @@ function nextMoisture(current, valveOpen) {
 // Device sensor simulator — runs a JS interval to push readings
 // ---------------------------------------------------------------------------
 function DeviceSimulator() {
-  const { sitePath } = useSite()
+  const { sitePath, zones } = useSite()
   const sitePathRef = useRef(sitePath)
   useEffect(() => { sitePathRef.current = sitePath }, [sitePath])
 
   const [running,   setRunning]  = useState(false)
   const [interval,  setInterval_] = useState(INTERVALS[0])
   const [log,       setLog]      = useState([])
-  const [moisture,  setMoisture] = useState({ balcony: 62, garden: 45 })
-  const [valveOpen, setValveOpen] = useState({ balcony: false, garden: false })
+  const [moisture,  setMoisture] = useState({})
+  const [valveOpen, setValveOpen] = useState({})
   const timerRef  = useRef(null)
-  const stateRef  = useRef({ moisture: { balcony: 62, garden: 45 }, valveOpen: { balcony: false, garden: false } })
+  const stateRef  = useRef({ moisture: {}, valveOpen: {} })
+  const zonesRef  = useRef(zones)
+  useEffect(() => { zonesRef.current = zones }, [zones])
 
   // Keep ref in sync so the interval closure always has fresh values
   useEffect(() => {
@@ -55,8 +52,8 @@ function DeviceSimulator() {
     const { moisture: m, valveOpen: v } = stateRef.current
     const newMoisture = {}
 
-    for (const zone of ZONES) {
-      const pct = nextMoisture(m[zone.id], v[zone.id])
+    for (const zone of zonesRef.current) {
+      const pct = nextMoisture(m[zone.id] ?? 62, v[zone.id] ?? false)
       const raw = Math.round(3200 - (pct / 100) * 2000)
       newMoisture[zone.id] = pct
 
@@ -151,7 +148,7 @@ function DeviceSimulator() {
 // Ad-hoc zone actions — simulate device acting on a valve directly
 // ---------------------------------------------------------------------------
 function AdHocActions() {
-  const { sitePath } = useSite()
+  const { sitePath, zones } = useSite()
   const [log, setLog] = useState([])
 
   function addLog(msg) {
@@ -180,7 +177,7 @@ function AdHocActions() {
       <span style={styles.cardTitle}>Ad-hoc Device Actions</span>
       <p style={styles.hint}>Simulate single device actions without running the full simulator.</p>
 
-      {ZONES.map(z => (
+      {zones.map(z => (
         <div key={z.id} style={styles.zoneBlock}>
           <span style={styles.zoneName}>{z.label}</span>
           <div style={styles.actionRow}>
@@ -205,6 +202,7 @@ function AdHocActions() {
 // Schedule trigger — fire a schedule entry immediately
 // ---------------------------------------------------------------------------
 function ScheduleTrigger() {
+  const { zones } = useSite()
   const [log, setLog] = useState([])
 
   function addLog(msg) {
@@ -268,7 +266,7 @@ function ScheduleTrigger() {
       <span style={styles.cardTitle}>Schedule Trigger</span>
       <p style={styles.hint}>Fire a schedule immediately without waiting for the clock. Valve closes after the configured duration.</p>
 
-      {ZONES.map(z => <ZoneTrigger key={z.id} zoneId={z.id} label={z.label} />)}
+      {zones.map(z => <ZoneTrigger key={z.id} zoneId={z.id} label={z.label} />)}
 
       {log.length > 0 && (
         <div style={styles.log}>
@@ -293,7 +291,7 @@ const ZONE_START = { balcony: 60, garden: 57 }
 const WATERING_TICKS = new Set([36, 108])  // 06:00 = tick 36, 18:00 = tick 108
 
 function DataSeeder() {
-  const { sitePath } = useSite()
+  const { sitePath, zones } = useSite()
   const [seedDate, setSeedDate]   = useState(todayStr)
   const [seeding,  setSeeding]    = useState(false)
   const [log,      setLog]        = useState([])
@@ -312,8 +310,8 @@ function DataSeeder() {
     const updates = {}
     let seqN = 0
 
-    for (const zone of ZONES) {
-      let pct = ZONE_START[zone.id]
+    for (const zone of zones) {
+      let pct = ZONE_START[zone.id] ?? 60
 
       for (let tick = 0; tick < 144; tick++) {
         const ts         = dayStart + tick * TICK_MS
@@ -335,7 +333,7 @@ function DataSeeder() {
     }
 
     await update(ref(db), updates)
-    addLog(`Seeded ${seedDate}: 144 readings × ${ZONES.length} zones — watering at 06:00 & 18:00`)
+    addLog(`Seeded ${seedDate}: 144 readings × ${zones.length} zones — watering at 06:00 & 18:00`)
     setSeeding(false)
   }
 

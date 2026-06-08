@@ -1,9 +1,5 @@
 import { useZoneData, useDeviceData } from '../hooks/useZoneData'
-
-const ZONES = [
-  { id: 'balcony', label: 'Balcony' },
-  { id: 'garden',  label: 'Garden' }
-]
+import { useSite } from '../context/SiteContext'
 
 function MoistureGauge({ percent }) {
   const clamped = Math.max(0, Math.min(100, percent ?? 0))
@@ -66,10 +62,14 @@ function DeviceStatus({ deviceId }) {
 }
 
 export default function Dashboard() {
+  const { zones } = useSite()
   return (
     <div style={styles.page}>
       <DeviceStatus deviceId="esp32-01" />
-      {ZONES.map(z => (
+      {zones.length === 0 && (
+        <p style={styles.empty}>No zones configured for this site.</p>
+      )}
+      {zones.map(z => (
         <ZoneCard key={z.id} zoneId={z.id} label={z.label} />
       ))}
     </div>
@@ -89,5 +89,6 @@ const styles = {
   meta:       { display: 'flex', flexDirection: 'column', gap: '0.25rem', color: '#7aab90', fontSize: '0.8rem' },
   deviceBar:  { display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#1e2d24', borderRadius: '8px', padding: '0.6rem 1rem' },
   dot:        { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
-  deviceText: { color: '#7aab90', fontSize: '0.78rem' }
+  deviceText: { color: '#7aab90', fontSize: '0.78rem' },
+  empty:      { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }
 }

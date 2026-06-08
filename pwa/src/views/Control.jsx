@@ -6,11 +6,6 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
 
-const ZONES = [
-  { id: 'balcony', label: 'Balcony' },
-  { id: 'garden',  label: 'Garden' }
-]
-
 function ZoneControl({ zoneId, label }) {
   const { valve, command } = useZoneData(zoneId)
   const { sitePath } = useSite()
@@ -80,12 +75,16 @@ function ZoneControl({ zoneId, label }) {
 }
 
 export default function Control() {
+  const { zones } = useSite()
   return (
     <div style={styles.page}>
       <p style={styles.note}>
         OPEN commands require confirmation. Valves close automatically after 10 minutes.
       </p>
-      {ZONES.map(z => (
+      {zones.length === 0 && (
+        <p style={styles.empty}>No zones configured for this site.</p>
+      )}
+      {zones.map(z => (
         <ZoneControl key={z.id} zoneId={z.id} label={z.label} />
       ))}
     </div>
@@ -103,5 +102,6 @@ const styles = {
   btnRow:        { display: 'flex', gap: '0.75rem' },
   btn:           { flex: 1, padding: '0.8rem', borderRadius: '10px', border: 'none', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' },
   btnOpen:       { background: '#e05c3a', color: '#fff' },
-  btnClose:      { background: '#2e4a38', color: '#a0c8b0' }
+  btnClose:      { background: '#2e4a38', color: '#a0c8b0' },
+  empty:         { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }
 }

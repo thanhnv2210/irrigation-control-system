@@ -11,7 +11,8 @@ export function SiteProvider({ children }) {
   const [siteId, setSiteIdState] = useState(
     () => localStorage.getItem(STORAGE_KEY) || DEFAULT_SITE
   )
-  const [sites, setSites] = useState({})
+  const [sites, setSites]   = useState({})
+  const [zones, setZones]   = useState([])
 
   // Watch all sites from Firebase
   useEffect(() => {
@@ -20,6 +21,19 @@ export function SiteProvider({ children }) {
     })
     return unsub
   }, [])
+
+  // Watch zones for current site — derived from meta keys under zones/
+  useEffect(() => {
+    const unsub = onValue(ref(db, `irrigation/sites/${siteId}/zones`), snap => {
+      const val = snap.val()
+      if (!val) { setZones([]); return }
+      const list = Object.entries(val)
+        .filter(([, z]) => z?.meta)
+        .map(([id, z]) => ({ id, label: z.meta?.name || id }))
+      setZones(list)
+    })
+    return unsub
+  }, [siteId])
 
   function setSiteId(id) {
     localStorage.setItem(STORAGE_KEY, id)
@@ -54,7 +68,7 @@ export function SiteProvider({ children }) {
   }
 
   return (
-    <SiteContext.Provider value={{ siteId, setSiteId, sitePath, sites, createSite, renameSite, deleteSite }}>
+    <SiteContext.Provider value={{ siteId, setSiteId, sitePath, sites, zones, createSite, renameSite, deleteSite }}>
       {children}
     </SiteContext.Provider>
   )

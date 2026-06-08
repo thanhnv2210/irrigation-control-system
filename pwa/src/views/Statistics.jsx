@@ -4,8 +4,7 @@ import {
   Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer
 } from 'recharts'
 import { useHistory, useHistoryByDate } from '../hooks/useHistory'
-
-const ZONES   = [{ id: 'balcony', label: 'Balcony' }, { id: 'garden', label: 'Garden' }]
+import { useSite } from '../context/SiteContext'
 const RANGES  = [
   { label: '4h',  points: 24  },
   { label: '8h',  points: 48  },
@@ -170,6 +169,7 @@ function ZoneChart({ zoneId, label, mode, range, dateStr }) {
 }
 
 export default function Statistics() {
+  const { zones } = useSite()
   const [mode,    setMode]    = useState('recent')   // 'recent' | 'date'
   const [range,   setRange]   = useState(RANGES[1])  // default 8h
   const [dateStr, setDateStr] = useState(todayStr)
@@ -211,7 +211,12 @@ export default function Statistics() {
         </div>
       )}
 
-      {ZONES.map(z => (
+      {zones.length === 0 && (
+        <p style={{ color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
+          No zones configured for this site.
+        </p>
+      )}
+      {zones.map(z => (
         <ZoneChart
           key={z.id}
           zoneId={z.id}

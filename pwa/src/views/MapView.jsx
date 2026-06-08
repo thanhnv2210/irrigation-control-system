@@ -8,11 +8,6 @@ import { useSite } from '../context/SiteContext'
 const GARDEN_W = 10
 const GARDEN_H = 20
 
-const ZONES = [
-  { id: 'balcony', label: 'Balcony' },
-  { id: 'garden',  label: 'Garden'  },
-]
-
 // Colours ─────────────────────────────────────────────────────────────────
 function moistureColor(pct) {
   if (pct == null) return '#7aab90'
@@ -107,7 +102,7 @@ function GridLines({ svgW, svgH }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────
 export default function MapView() {
-  const { sitePath } = useSite()
+  const { sitePath, zones } = useSite()
   const svgRef   = useRef(null)
   const [placing, setPlacing] = useState(null)
   const [metas,   setMetas]   = useState({})
@@ -119,13 +114,13 @@ export default function MapView() {
   const SVG_H = 400
 
   useEffect(() => {
-    const unsubs = ZONES.map(z =>
+    const unsubs = zones.map(z =>
       onValue(ref(db, sitePath(`zones/${z.id}/meta`)), snap =>
         setMetas(prev => ({ ...prev, [z.id]: snap.val() }))
       )
     )
     return () => unsubs.forEach(u => u())
-  }, [sitePath])
+  }, [sitePath, zones])
 
   // ── Place mode — click on SVG ─────────────────────────────────────────
   function handleSvgClick(e) {
@@ -169,7 +164,7 @@ export default function MapView() {
   }
 
   async function savePos(zoneId, px, py) {
-    const zone     = ZONES.find(z => z.id === zoneId)
+    const zone     = zones.find(z => z.id === zoneId)
     const existing = metas[zoneId] ?? {}
     await set(ref(db, sitePath(`zones/${zoneId}/meta`)), {
       name:    existing.name    || zone.label,
@@ -188,7 +183,7 @@ export default function MapView() {
 
       {/* Pin buttons */}
       <div style={styles.btnRow}>
-        {ZONES.map(z => {
+        {zones.map(z => {
           const hasPin = metas[z.id]?.px != null
           const active = placing === z.id
           return (
@@ -220,7 +215,7 @@ export default function MapView() {
           <GridLines svgW={SVG_W} svgH={SVG_H} />
 
           {/* Zone pins */}
-          {ZONES.map(z => (
+          {zones.map(z => (
             <ZonePin
               key={z.id}
               zone={z}
