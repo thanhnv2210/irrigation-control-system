@@ -8,18 +8,20 @@ import Simulator  from './views/Simulator'
 import Alerts     from './views/Alerts'
 import AuditLog   from './views/AuditLog'
 import MapView    from './views/MapView'
+import Settings   from './views/Settings'
 import { useAlertMonitor } from './hooks/useAlertMonitor'
 import { SiteProvider, useSite } from './context/SiteContext'
 
 const TABS = [
-  { id: 'dashboard',  label: 'Dash'    },
-  { id: 'control',    label: 'Control' },
-  { id: 'schedule',   label: 'Sched'   },
-  { id: 'map',        label: 'Map'     },
-  { id: 'statistics', label: 'Stats'   },
-  { id: 'alerts',     label: 'Alerts'  },
-  { id: 'auditlog',   label: 'Log'     },
-  { id: 'simulator',  label: 'Sim'     },
+  { id: 'dashboard',  label: 'Dash'     },
+  { id: 'control',    label: 'Control'  },
+  { id: 'schedule',   label: 'Sched'    },
+  { id: 'map',        label: 'Map'      },
+  { id: 'statistics', label: 'Stats'    },
+  { id: 'alerts',     label: 'Alerts'   },
+  { id: 'auditlog',   label: 'Log'      },
+  { id: 'simulator',  label: 'Sim'      },
+  { id: 'settings',   label: 'Settings' },
 ]
 
 function LoginScreen({ onLogin }) {
@@ -65,101 +67,26 @@ function AlertMonitor() {
   return null
 }
 
-// Site switcher shown in the header
+// Site switcher shown in the header — switch only; manage in Settings tab
 function SiteSwitcher() {
-  const { siteId, setSiteId, sites, createSite, renameSite, deleteSite } = useSite()
-  const [creating,  setCreating]  = useState(false)
-  const [renaming,  setRenaming]  = useState(false)
-  const [newName,   setNewName]   = useState('')
-  const [editName,  setEditName]  = useState('')
-
+  const { siteId, setSiteId, sites } = useSite()
   const siteList = Object.entries(sites)
-
-  async function handleCreate(e) {
-    e.preventDefault()
-    if (!newName.trim()) return
-    await createSite(newName.trim())
-    setNewName('')
-    setCreating(false)
-  }
-
-  function startRename() {
-    setEditName(sites[siteId]?.meta?.name || siteId)
-    setRenaming(true)
-  }
-
-  async function handleRename(e) {
-    e.preventDefault()
-    if (!editName.trim()) return
-    await renameSite(siteId, editName.trim())
-    setRenaming(false)
-  }
-
-  async function handleDelete() {
-    const name = sites[siteId]?.meta?.name || siteId
-    if (!confirm(`Delete "${name}"? This removes all its data permanently.`)) return
-    await deleteSite(siteId)
-  }
-
-  if (renaming) {
-    return (
-      <form onSubmit={handleRename} style={styles.siteRow}>
-        <input
-          autoFocus
-          style={styles.siteInput}
-          value={editName}
-          onChange={e => setEditName(e.target.value)}
-          onKeyDown={e => e.key === 'Escape' && setRenaming(false)}
-        />
-        <button style={styles.siteAddBtn} type="submit">✓</button>
-        <button style={styles.siteCancelBtn} type="button" onClick={() => setRenaming(false)}>✕</button>
-      </form>
-    )
-  }
-
-  if (creating) {
-    return (
-      <form onSubmit={handleCreate} style={styles.siteRow}>
-        <input
-          autoFocus
-          style={styles.siteInput}
-          placeholder="Site name…"
-          value={newName}
-          onChange={e => setNewName(e.target.value)}
-          onKeyDown={e => e.key === 'Escape' && setCreating(false)}
-        />
-        <button style={styles.siteAddBtn} type="submit">Add</button>
-        <button style={styles.siteCancelBtn} type="button" onClick={() => setCreating(false)}>✕</button>
-      </form>
-    )
-  }
+  const currentName = sites[siteId]?.meta?.name || siteId
 
   if (siteList.length <= 1) {
-    const currentName = sites[siteId]?.meta?.name || siteId
-    return (
-      <div style={styles.siteRow}>
-        <span style={styles.siteName}>{currentName}</span>
-        <button style={styles.siteIconBtn} onClick={startRename} title="Rename site">✎</button>
-        <button style={styles.siteAddBtn} onClick={() => setCreating(true)}>+ Site</button>
-      </div>
-    )
+    return <span style={styles.siteName}>{currentName}</span>
   }
 
   return (
-    <div style={styles.siteRow}>
-      <select
-        style={styles.siteSelect}
-        value={siteId}
-        onChange={e => setSiteId(e.target.value)}
-      >
-        {siteList.map(([id, s]) => (
-          <option key={id} value={id}>{s?.meta?.name || id}</option>
-        ))}
-      </select>
-      <button style={styles.siteIconBtn} onClick={startRename} title="Rename site">✎</button>
-      <button style={styles.siteAddBtn} onClick={() => setCreating(true)}>+ Site</button>
-      <button style={styles.siteDeleteBtn} onClick={handleDelete} title="Delete this site">🗑</button>
-    </div>
+    <select
+      style={styles.siteSelect}
+      value={siteId}
+      onChange={e => setSiteId(e.target.value)}
+    >
+      {siteList.map(([id, s]) => (
+        <option key={id} value={id}>{s?.meta?.name || id}</option>
+      ))}
+    </select>
   )
 }
 
@@ -193,6 +120,7 @@ function AppShell() {
         {tab === 'alerts'     && <Alerts />}
         {tab === 'auditlog'   && <AuditLog />}
         {tab === 'simulator'  && <Simulator />}
+        {tab === 'settings'   && <Settings />}
       </main>
 
       <nav style={styles.nav}>
@@ -219,14 +147,8 @@ const styles = {
   app:           { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#0f1f15', color: '#e0f0e8', fontFamily: 'system-ui, sans-serif', maxWidth: '480px', margin: '0 auto' },
   header:        { padding: '0.75rem 1rem', borderBottom: '1px solid #1e2d24', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' },
   title:         { fontSize: '1.2rem', fontWeight: 700, color: '#1a7f4b', flexShrink: 0 },
-  siteRow:       { display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, justifyContent: 'flex-end' },
   siteName:      { color: '#a0c8b0', fontSize: '0.82rem', fontWeight: 500 },
-  siteSelect:    { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.8rem', padding: '0.3rem 0.5rem', flex: 1, maxWidth: '160px' },
-  siteInput:     { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.8rem', padding: '0.3rem 0.5rem', flex: 1, outline: 'none' },
-  siteAddBtn:    { background: '#1a7f4b', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.75rem', padding: '0.3rem 0.6rem', cursor: 'pointer', flexShrink: 0 },
-  siteCancelBtn: { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.75rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
-  siteIconBtn:   { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.8rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
-  siteDeleteBtn: { background: 'transparent', border: '1px solid #e05c3a', borderRadius: '6px', color: '#e05c3a', fontSize: '0.75rem', padding: '0.3rem 0.5rem', cursor: 'pointer', flexShrink: 0 },
+  siteSelect:    { background: '#1e2d24', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.8rem', padding: '0.3rem 0.5rem', maxWidth: '160px' },
   main:          { flex: 1, overflowY: 'auto' },
   nav:           { display: 'flex', borderTop: '1px solid #1e2d24', flexShrink: 0 },
   navBtn:        { flex: 1, padding: '0.9rem 0', background: 'transparent', border: 'none', color: '#7aab90', fontSize: '0.75rem', cursor: 'pointer' },
