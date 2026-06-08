@@ -252,10 +252,10 @@ const styles = {
   page:       { display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem' },
   hint:       { color: '#7aab90', fontSize: '0.8rem', margin: 0 },
   btnRow:     { display: 'flex', gap: '0.5rem' },
-  pinBtn:     { flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', color: '#fff', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' },
+  pinBtn:     { flex: 1, padding: '0.7rem', borderRadius: '8px', border: 'none', color: '#fff', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer' },
   svgWrap:    { width: '100%', aspectRatio: `${GARDEN_W} / ${GARDEN_H}`, maxHeight: '60vh', background: '#0f1f15', borderRadius: '12px', border: '1px solid #2e4a38', overflow: 'hidden' },
   legend:     { display: 'flex', gap: '0.75rem', flexWrap: 'wrap' },
   legendItem: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
   dot:        { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
-  legendText: { color: '#7aab90', fontSize: '0.75rem' },
+  legendText: { color: '#7aab90', fontSize: '0.8rem' },
 }

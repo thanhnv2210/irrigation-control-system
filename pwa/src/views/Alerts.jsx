@@ -246,7 +246,7 @@ const styles = {
   lbl:          { color: '#a0c8b0', fontSize: '0.8rem' },
   input:        { background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.6rem 0.75rem', color: '#e0f0e8', fontSize: '0.9rem', outline: 'none' },
   btnRow:       { display: 'flex', gap: '0.75rem' },
-  btn:          { flex: 1, padding: '0.65rem', borderRadius: '8px', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' },
+  btn:          { flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' },
   zoneRow:      { borderTop: '1px solid #2e4a38', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' },
   zoneHeader:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   zoneName:     { color: '#e0f0e8', fontWeight: 600, fontSize: '0.9rem' },

@@ -93,14 +93,14 @@ export default function Control() {
 
 const styles = {
   page:          { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
-  note:          { color: '#7aab90', fontSize: '0.82rem', margin: 0 },
+  note:          { color: '#7aab90', fontSize: '0.85rem', margin: 0 },
   card:          { background: '#1e2d24', borderRadius: '12px', padding: '1.25rem' },
   header:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' },
   label:         { color: '#e0f0e8', fontSize: '1.1rem', fontWeight: 600 },
-  badge:         { color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.6rem', borderRadius: '6px' },
-  pendingBanner: { background: '#2a3d2e', color: '#e0b03a', fontSize: '0.8rem', padding: '0.5rem 0.75rem', borderRadius: '6px', marginBottom: '0.75rem' },
+  badge:         { color: '#fff', fontSize: '0.78rem', fontWeight: 700, padding: '0.3rem 0.7rem', borderRadius: '6px' },
+  pendingBanner: { background: '#2a3d2e', color: '#e0b03a', fontSize: '0.85rem', padding: '0.6rem 0.85rem', borderRadius: '8px', marginBottom: '0.75rem' },
   btnRow:        { display: 'flex', gap: '0.75rem' },
-  btn:           { flex: 1, padding: '0.8rem', borderRadius: '10px', border: 'none', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' },
+  btn:           { flex: 1, padding: '1rem', borderRadius: '12px', border: 'none', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' },
   btnOpen:       { background: '#e05c3a', color: '#fff' },
   btnClose:      { background: '#2e4a38', color: '#a0c8b0' },
   empty:         { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }

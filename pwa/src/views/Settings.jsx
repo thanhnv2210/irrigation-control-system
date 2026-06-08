@@ -214,14 +214,14 @@ const styles = {
   siteNameActive:  { color: '#e0f0e8', fontWeight: 600 },
   activePill:      { background: '#1a3d28', color: '#1a7f4b', fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #1a7f4b' },
   siteActions:     { display: 'flex', gap: '0.3rem', flexShrink: 0 },
-  iconBtn:         { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '5px', color: '#7aab90', fontSize: '0.75rem', padding: '0.2rem 0.45rem', cursor: 'pointer' },
+  iconBtn:         { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.85rem', padding: '0.4rem 0.6rem', cursor: 'pointer' },
   iconBtnDanger:   { borderColor: '#e05c3a', color: '#e05c3a' },
 
   // Inline rename
-  inlineForm:      { display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1 },
-  inlineInput:     { background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.9rem', padding: '0.2rem 0.5rem', flex: 1, outline: 'none' },
-  inlineSave:      { background: '#1a7f4b', border: 'none', borderRadius: '5px', color: '#fff', fontSize: '0.75rem', padding: '0.2rem 0.45rem', cursor: 'pointer' },
-  inlineCancel:    { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '5px', color: '#7aab90', fontSize: '0.75rem', padding: '0.2rem 0.45rem', cursor: 'pointer' },
+  inlineForm:      { display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 },
+  inlineInput:     { background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '6px', color: '#e0f0e8', fontSize: '0.95rem', padding: '0.4rem 0.6rem', flex: 1, outline: 'none' },
+  inlineSave:      { background: '#1a7f4b', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', padding: '0.4rem 0.6rem', cursor: 'pointer' },
+  inlineCancel:    { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.85rem', padding: '0.4rem 0.6rem', cursor: 'pointer' },
 
   // Add form
   addForm:         { display: 'flex', gap: '0.4rem', marginTop: '0.75rem' },

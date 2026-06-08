@@ -119,7 +119,7 @@ export default function AuditLog() {
 const styles = {
   page:         { display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem' },
   filterRow:    { display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' },
-  filterBtn:    { padding: '0.35rem 0.85rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.82rem', cursor: 'pointer' },
+  filterBtn:    { padding: '0.55rem 1rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.85rem', cursor: 'pointer' },
   filterActive: { background: '#1a7f4b', color: '#fff', borderColor: '#1a7f4b' },
   count:        { marginLeft: 'auto', color: '#3a5a45', fontSize: '0.75rem' },
   empty:        { color: '#7aab90', fontSize: '0.85rem', textAlign: 'center', padding: '3rem 0' },
@@ -127,8 +127,8 @@ const styles = {
   entryIcon:    { fontSize: '1.1rem', lineHeight: 1, flexShrink: 0, marginTop: '0.1rem' },
   entryBody:    { display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minWidth: 0 },
   entryTop:     { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' },
-  entryAction:  { fontWeight: 600, fontSize: '0.85rem' },
-  entryTime:    { color: '#3a5a45', fontSize: '0.75rem', flexShrink: 0 },
-  entryDetail:  { color: '#e0f0e8', fontSize: '0.82rem' },
-  entryUser:    { color: '#3a5a45', fontSize: '0.72rem' },
+  entryAction:  { fontWeight: 600, fontSize: '0.88rem' },
+  entryTime:    { color: '#3a5a45', fontSize: '0.78rem', flexShrink: 0 },
+  entryDetail:  { color: '#e0f0e8', fontSize: '0.85rem' },
+  entryUser:    { color: '#3a5a45', fontSize: '0.78rem' },
 }
