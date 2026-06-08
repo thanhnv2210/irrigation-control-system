@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { auth, signOut } from '../firebase'
+import { auth } from '../firebase'
 import { useSite } from '../context/SiteContext'
 
 // ── User Profile ─────────────────────────────────────────────────────────────
 function UserProfile() {
   const user = auth.currentUser
-  const [signingOut, setSigningOut] = useState(false)
-
   if (!user) return null
 
   const joined = user.metadata?.creationTime
@@ -16,21 +14,9 @@ function UserProfile() {
     ? new Date(user.metadata.lastSignInTime).toLocaleString()
     : '—'
 
-  async function handleSignOut() {
-    if (!confirm('Sign out?')) return
-    setSigningOut(true)
-    await signOut()
-  }
-
   return (
     <div style={styles.card}>
       <span style={styles.cardTitle}>User Profile</span>
-
-      <div style={styles.profileAvatar}>
-        <span style={styles.avatarInitial}>
-          {(user.displayName || user.email || '?')[0].toUpperCase()}
-        </span>
-      </div>
 
       <div style={styles.fieldList}>
         <div style={styles.field}>
@@ -57,13 +43,9 @@ function UserProfile() {
         </div>
       </div>
 
-      <button
-        style={{ ...styles.btn, background: '#3a1e1e', color: '#e05c3a', border: '1px solid #e05c3a', marginTop: '0.5rem' }}
-        onClick={handleSignOut}
-        disabled={signingOut}
-      >
-        {signingOut ? 'Signing out…' : 'Sign Out'}
-      </button>
+      <p style={{ color: '#7aab90', fontSize: '0.78rem', margin: 0 }}>
+        To sign out, open the ☰ menu.
+      </p>
     </div>
   )
 }
@@ -198,8 +180,6 @@ const styles = {
   hint:            { color: '#7aab90', fontSize: '0.8rem', margin: 0 },
 
   // Profile
-  profileAvatar:   { display: 'flex', justifyContent: 'center', paddingTop: '0.25rem' },
-  avatarInitial:   { width: '52px', height: '52px', borderRadius: '50%', background: '#1a7f4b', color: '#fff', fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   fieldList:       { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   field:           { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', borderBottom: '1px solid #2e4a38', paddingBottom: '0.35rem' },
   fieldLabel:      { color: '#7aab90', fontSize: '0.78rem', flexShrink: 0 },
