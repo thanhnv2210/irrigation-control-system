@@ -3,7 +3,7 @@
  * Smart Irrigation Controller — ESP32
  *
  * Zones: balcony (zone 1), garden (zone 2)
- * Firebase RTDB path: /irrigation/zones/{zone_id}/
+ * Firebase RTDB path: irrigation/sites/{SITE_ID}/zones/{zone_id}/
  *
  * Build requirements:
  *   - FirebaseESP32 by mobizt (Arduino Library Manager)
@@ -121,6 +121,16 @@ static uint32_t lastHeartbeatMs = 0;
 static uint32_t lastFirebaseOkMs = 0;  // tracks last successful Firebase call
 
 // ---------------------------------------------------------------------------
+// Path helper — all data lives under irrigation/sites/{SITE_ID}/
+// ---------------------------------------------------------------------------
+static String zonePath(const char* zoneId) {
+  return String("irrigation/sites/") + SITE_ID + "/zones/" + zoneId;
+}
+static String devicePath() {
+  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID;
+}
+
+// ---------------------------------------------------------------------------
 // Relay control
 // ---------------------------------------------------------------------------
 void openValve(int zoneIdx, const char* openedBy) {
@@ -128,13 +138,13 @@ void openValve(int zoneIdx, const char* openedBy) {
   if (z.valveOpen) return;
 
   digitalWrite(z.relayPin, LOW);  // Active-LOW relay
-  z.valveOpen    = true;
+  z.valveOpen     = true;
   z.valveOpenedAt = millis();
 
-  String basePath = String("/irrigation/zones/") + z.id;
-  Firebase.setString(fbdo, basePath + "/valve/state",       "OPEN");
-  Firebase.setString(fbdo, basePath + "/valve/openedBy",    openedBy);
-  Firebase.setInt   (fbdo, basePath + "/valve/lastChangedAt", (int)millis());
+  String base = zonePath(z.id);
+  Firebase.setString(fbdo, base + "/valve/state",         "OPEN");
+  Firebase.setString(fbdo, base + "/valve/openedBy",      openedBy);
+  Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
 
   Serial.printf("[Zone %s] Valve OPEN (by %s)\n", z.id, openedBy);
 }
@@ -146,9 +156,9 @@ void closeValve(int zoneIdx) {
   digitalWrite(z.relayPin, HIGH);  // Active-LOW relay — HIGH = off
   z.valveOpen = false;
 
-  String basePath = String("/irrigation/zones/") + z.id;
-  Firebase.setString(fbdo, basePath + "/valve/state",         "CLOSED");
-  Firebase.setInt   (fbdo, basePath + "/valve/lastChangedAt", (int)millis());
+  String base = zonePath(z.id);
+  Firebase.setString(fbdo, base + "/valve/state",         "CLOSED");
+  Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
 
   Serial.printf("[Zone %s] Valve CLOSED\n", z.id);
 }
@@ -185,7 +195,7 @@ void loadSchedules() {
   for (int zi = 0; zi < 2; zi++) {
     scheduleCount[zi] = 0;
     const char* zoneId = zones[zi].id;
-    String path = String("/irrigation/zones/") + zoneId + "/schedule";
+    String path = zonePath(zoneId) + "/schedule";
 
     if (!Firebase.getJSON(fbdo, path)) {
       Serial.printf("[Schedule] Load failed for %s: %s\n", zoneId, fbdo.errorReason().c_str());
@@ -288,7 +298,7 @@ void readAndPublishSensors() {
     int raw = analogRead(z.sensorPin);
     int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
 
-    String basePath = String("/irrigation/zones/") + z.id;
+    String base = zonePath(z.id);
 
     // Overwrite current sensor reading
     FirebaseJson sensorJson;
@@ -296,7 +306,7 @@ void readAndPublishSensors() {
     sensorJson.set("rawValue",        raw);
     sensorJson.set("timestamp/.sv",   "timestamp");
 
-    if (Firebase.updateNode(fbdo, basePath + "/sensor", sensorJson)) {
+    if (Firebase.updateNode(fbdo, base + "/sensor", sensorJson)) {
       lastFirebaseOkMs = millis();
       Serial.printf("[Zone %s] Moisture: %d%% (raw %d)\n", z.id, pct, raw);
     } else {
@@ -309,9 +319,9 @@ void readAndPublishSensors() {
     histJson.set("moisturePercent", pct);
     histJson.set("rawValue",        raw);
     histJson.set("timestamp/.sv",   "timestamp");
+    histJson.set("valveOpen",       z.valveOpen);
 
-    String histPath = basePath + "/history";
-    if (!Firebase.pushJSON(fbdo, histPath, histJson)) {
+    if (!Firebase.pushJSON(fbdo, base + "/history", histJson)) {
       Serial.printf("[Zone %s] History push failed: %s\n", z.id, fbdo.errorReason().c_str());
     }
   }
@@ -321,15 +331,13 @@ void readAndPublishSensors() {
 // Device heartbeat
 // ---------------------------------------------------------------------------
 void publishHeartbeat() {
-  String basePath = String("/irrigation/devices/") + DEVICE_ID;
-
   FirebaseJson json;
-  json.set("firmware",       FIRMWARE_VERSION);
-  json.set("lastSeen/.sv",   "timestamp");
-  json.set("ipAddress",      WiFi.localIP().toString());
-  json.set("wifiRssi",       WiFi.RSSI());
+  json.set("firmware",      FIRMWARE_VERSION);
+  json.set("lastSeen/.sv",  "timestamp");
+  json.set("ipAddress",     WiFi.localIP().toString());
+  json.set("wifiRssi",      WiFi.RSSI());
 
-  if (Firebase.updateNode(fbdo, basePath, json)) {
+  if (Firebase.updateNode(fbdo, devicePath(), json)) {
     lastFirebaseOkMs = millis();
   }
 }
@@ -338,7 +346,7 @@ void publishHeartbeat() {
 // Command handler (called from stream callbacks)
 // ---------------------------------------------------------------------------
 void handleCommand(int zoneIdx, const String& action) {
-  String clearPath = String("/irrigation/zones/") + zones[zoneIdx].id + "/command/action";
+  String clearPath = zonePath(zones[zoneIdx].id) + "/command/action";
 
   if (action == "OPEN") {
     openValve(zoneIdx, "manual");
@@ -484,8 +492,8 @@ void setup() {
     lastFirebaseOkMs = millis();
 
     // Start command streams
-    String cmdPath1 = String("/irrigation/zones/") + ZONE_1_ID + "/command/action";
-    String cmdPath2 = String("/irrigation/zones/") + ZONE_2_ID + "/command/action";
+    String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
+    String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
 
     if (!Firebase.beginStream(streamZ1, cmdPath1)) {
       Serial.printf("[Firebase] Stream Z1 failed: %s\n", streamZ1.errorReason().c_str());

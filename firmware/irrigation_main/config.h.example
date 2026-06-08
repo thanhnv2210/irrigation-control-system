@@ -9,7 +9,11 @@
 #define FIREBASE_PASSWORD     "your-password"
 #define FIREBASE_DB_URL       "your-project-default-rtdb.region.firebasedatabase.app"
 
-// Zone IDs (must match keys used in Firebase RTDB)
+// Site ID — must match the key under irrigation/sites/ in Firebase
+// Find this in the PWA Settings tab (shown in the site list URL or browser storage)
+#define SITE_ID               "default"
+
+// Zone IDs (must match keys under irrigation/sites/{SITE_ID}/zones/)
 #define ZONE_1_ID             "balcony"
 #define ZONE_2_ID             "garden"
 
