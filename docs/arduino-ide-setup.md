@@ -78,7 +78,18 @@ Mac installs the driver automatically.
 
 **File > Open** → navigate to `irrigation_main/irrigation_main.ino`
 
-Make sure `config.h` exists in the same folder (copied from `config.h.example` with real credentials filled in).
+Make sure `config.h` exists in the same folder (copied from `config.h.example` with real values filled in).
+
+**Required values before compiling:**
+
+| Define | Where to get it |
+|---|---|
+| `FIREBASE_API_KEY` | Firebase console → Project settings → Web API key |
+| `FIREBASE_EMAIL` | `esp32-irrigation@device.local` — device account (see firebase-setup.md §1) |
+| `FIREBASE_PASSWORD` | Password you set when creating the device account |
+| `FIREBASE_DB_URL` | Firebase console → Realtime Database → URL |
+| `SITE_ID` | Open the PWA → hamburger menu → Settings → note the active site key, or check Firebase under `irrigation/sites/` |
+| `ZONE_1_ID` / `ZONE_2_ID` | Must match zone IDs the PWA will create (default: `"balcony"` / `"garden"`) |
 
 ---
 

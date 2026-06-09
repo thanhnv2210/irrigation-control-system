@@ -51,10 +51,12 @@ User  -> ESP  : Open Arduino IDE,\nflash irrigation_main.ino\nwith config.h poin
 note over ESP
   config.h must contain:
   • FIREBASE_API_KEY
-  • FIREBASE_EMAIL / PASSWORD
+  • FIREBASE_EMAIL / PASSWORD  (device account)
   • FIREBASE_DB_URL
-  • ZONE_1_ID = "zone-a"
-  • ZONE_2_ID = "zone-b"  (or any IDs)
+  • SITE_ID     = key from PWA Settings (e.g. "default")
+  • ZONE_1_ID   = "balcony"  (or any IDs)
+  • ZONE_2_ID   = "garden"
+  • DEVICE_ID   = "esp32-01"
 end note
 
 == Step 3 — WiFi Provisioning (Captive Portal) ==
@@ -87,12 +89,11 @@ end note
 
 == Step 5 — Zone Bootstrap (first publish) ==
 
-ESP   -> FB   : set  zones/{zone-a}/meta\n{ name:"Zone A", enabled:true }
-ESP   -> FB   : set  zones/{zone-b}/meta\n{ name:"Zone B", enabled:true }
-ESP   -> FB   : set  zones/{zone-a}/sensor\n{ moisturePercent, rawValue, timestamp }
-ESP   -> FB   : push zones/{zone-a}/history  ← first reading
-ESP   -> FB   : set  zones/{zone-b}/sensor   ← same for zone B
-ESP   -> FB   : push zones/{zone-b}/history
+ESP   -> FB   : set  sites/{SITE_ID}/zones/{zone-a}/sensor\n{ moisturePercent, rawValue, timestamp }
+ESP   -> FB   : push sites/{SITE_ID}/zones/{zone-a}/history  ← first reading
+ESP   -> FB   : set  sites/{SITE_ID}/zones/{zone-b}/sensor   ← same for zone B
+ESP   -> FB   : push sites/{SITE_ID}/zones/{zone-b}/history
+ESP   -> FB   : set  sites/{SITE_ID}/devices/esp32-01\n{ firmware, ipAddress, wifiRssi, lastSeen }
 
 FB   --> PWA  : onValue() fires — zones list updates
 PWA  --> User : Dashboard shows Zone A & Zone B cards\nDevice status bar → ONLINE

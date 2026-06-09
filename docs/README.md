@@ -49,8 +49,8 @@ How to use the Postman collection to simulate ESP32 behavior against Firebase wh
 irrigation-control-system/
 ├── firmware/
 │   ├── irrigation_main/
-│   │   ├── irrigation_main.ino   — production firmware (M1 complete)
-│   │   ├── config.h              — credentials (gitignored, never commit)
+│   │   ├── irrigation_main.ino   — production firmware (M1 + M2 complete)
+│   │   ├── config.h              — credentials + SITE_ID (gitignored, never commit)
 │   │   └── config.h.example      — template with placeholder values
 │   ├── esp_32_auto_config_v1/    — WiFi provisioning sketch (reference)
 │   ├── elb_peripheral_v1/        — TCP + Firebase prototype (reference)
@@ -58,17 +58,34 @@ irrigation-control-system/
 ├── pwa/
 │   ├── src/
 │   │   ├── firebase.js           — Firebase init
-│   │   ├── hooks/useZoneData.js  — real-time Firebase hooks
-│   │   ├── views/                — Dashboard, Control, Schedule
-│   │   └── components/           — ConfirmDialog
+│   │   ├── context/SiteContext.jsx — multi-site state + path helper
+│   │   ├── hooks/
+│   │   │   ├── useZoneData.js    — real-time zone + device subscriptions
+│   │   │   ├── useHistory.js     — sensor history for Statistics
+│   │   │   └── useAlertMonitor.js — Telegram alert trigger
+│   │   ├── views/
+│   │   │   ├── Dashboard.jsx     — moisture gauges + device status
+│   │   │   ├── Control.jsx       — manual valve open/close
+│   │   │   ├── Schedule.jsx      — schedule editor per zone
+│   │   │   ├── Statistics.jsx    — moisture history chart
+│   │   │   ├── MapView.jsx       — drag-and-drop zone pins on garden SVG
+│   │   │   ├── Alerts.jsx        — Telegram + offline alert config
+│   │   │   ├── AuditLog.jsx      — valve/schedule event history
+│   │   │   ├── Simulator.jsx     — device simulator for testing without hardware
+│   │   │   └── Settings.jsx      — site management + user profile
+│   │   ├── components/
+│   │   │   └── ConfirmDialog.jsx — valve open confirmation modal
+│   │   └── utils/audit.js        — audit log writer
 │   ├── package.json
 │   └── vite.config.js
 ├── docs/
-│   ├── README.md             — this file
+│   ├── README.md                  — this file
 │   ├── hardware-guide.md
 │   ├── firebase-setup.md
 │   ├── arduino-ide-setup.md
-│   └── flashing-windows.md
+│   ├── flashing-windows.md
+│   ├── postman-simulator.md
+│   └── device-onboarding-flow.puml — PlantUML sequence diagram
 ├── database.rules.json       — Firebase RTDB security rules
 ├── firebase.json             — Firebase CLI deploy config
 ├── TODO.md                   — milestone progress tracker
@@ -83,7 +100,9 @@ irrigation-control-system/
 | Milestone | Status |
 |---|---|
 | M1 — Firmware: Core Loop | Complete — pending hardware for physical verification |
-| M2 — Firmware: Schedules + Multi-zone | Not started |
+| M2 — Firmware: Schedules + Multi-zone | Complete — pending hardware for physical verification |
 | M3 — React PWA: Dashboard + Manual Control | Complete — pending hardware for live data |
 | M4 — React PWA: Schedule Editor | Complete — pending hardware for live data |
 | M5 — Hardening | Security rules deployed — alerts and seasonal review pending |
+
+> **Next physical step:** assemble hardware, flash firmware, confirm `SITE_ID` in `config.h` matches the PWA site key, then power on and verify Serial Monitor output.
