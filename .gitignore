@@ -23,3 +23,5 @@ pwa/dist/
 
 # Arduino IDE 2.x
 .arduino15/
+
+tmp/

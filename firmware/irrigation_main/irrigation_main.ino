@@ -450,6 +450,19 @@ void setup() {
       Serial.print(".");
     }
     Serial.println();
+
+    if (WiFi.status() != WL_CONNECTED) {
+      int wifiStatus = WiFi.status();
+      // WL_IDLE_STATUS=0, WL_NO_SSID_AVAIL=1, WL_CONNECT_FAILED=4, WL_DISCONNECTED=6
+      Serial.printf("[WiFi] Connection failed — status code: %d\n", wifiStatus);
+      if (wifiStatus == WL_NO_SSID_AVAIL) {
+        Serial.printf("[WiFi] SSID '%s' not found — check name or move closer to router\n", wifiSSID.c_str());
+      } else if (wifiStatus == WL_CONNECT_FAILED) {
+        Serial.println("[WiFi] Wrong password");
+      } else {
+        Serial.println("[WiFi] Unknown error — check router 2.4GHz band is enabled");
+      }
+    }
   }
 
   if (WiFi.status() != WL_CONNECTED) {
