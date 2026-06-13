@@ -615,6 +615,27 @@ void setup() {
 }
 
 // ---------------------------------------------------------------------------
+// Stream health check — restart any stream that has dropped
+// ---------------------------------------------------------------------------
+static uint32_t lastStreamCheckMs = 0;
+
+void checkStreams() {
+  String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
+  String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
+
+  if (!Firebase.readStream(streamZ1) || streamZ1.streamTimeout()) {
+    Serial.println("[Firebase] Stream Z1 dropped — restarting");
+    Firebase.beginStream(streamZ1, cmdPath1);
+    Firebase.setStreamCallback(streamZ1, streamCallbackZ1, streamTimeoutCallback);
+  }
+  if (!Firebase.readStream(streamZ2) || streamZ2.streamTimeout()) {
+    Serial.println("[Firebase] Stream Z2 dropped — restarting");
+    Firebase.beginStream(streamZ2, cmdPath2);
+    Firebase.setStreamCallback(streamZ2, streamCallbackZ2, streamTimeoutCallback);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // loop()
 // ---------------------------------------------------------------------------
 void loop() {
@@ -654,6 +675,14 @@ void loop() {
   if (millis() - lastScheduleCheckMs >= 60000UL) {
     lastScheduleCheckMs = millis();
     checkSchedules();
+  }
+
+  // Stream health check every 10 seconds
+  if (millis() - lastStreamCheckMs >= 10000UL) {
+    lastStreamCheckMs = millis();
+    if (Firebase.ready()) {
+      checkStreams();
+    }
   }
 
   // Firebase watchdog
