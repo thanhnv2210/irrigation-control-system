@@ -151,16 +151,26 @@ void openValve(int zoneIdx, const char* openedBy) {
 
 void closeValve(int zoneIdx) {
   Zone& z = zones[zoneIdx];
-  if (!z.valveOpen) return;
+  Serial.printf("[Zone %s] closeValve() called — internal valveOpen=%s | relay pin=%d | pin state=%d\n",
+    z.id, z.valveOpen ? "true" : "false", z.relayPin, digitalRead(z.relayPin));
+
+  if (!z.valveOpen) {
+    // Force relay and Firebase to CLOSED even if internal state disagrees — safety net
+    Serial.printf("[Zone %s] Internal state says CLOSED but forcing relay+Firebase sync\n", z.id);
+    digitalWrite(z.relayPin, HIGH);
+    String base = zonePath(z.id);
+    bool ok = Firebase.setString(fbdo, base + "/valve/state", "CLOSED");
+    Serial.printf("[Zone %s] Firebase sync result: %s\n", z.id, ok ? "ok" : fbdo.errorReason().c_str());
+    return;
+  }
 
   digitalWrite(z.relayPin, HIGH);  // Active-LOW relay — HIGH = off
   z.valveOpen = false;
 
   String base = zonePath(z.id);
-  Firebase.setString(fbdo, base + "/valve/state",         "CLOSED");
-  Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
-
-  Serial.printf("[Zone %s] Valve CLOSED\n", z.id);
+  bool ok = Firebase.setString(fbdo, base + "/valve/state", "CLOSED");
+  Firebase.setInt(fbdo, base + "/valve/lastChangedAt", (int)millis());
+  Serial.printf("[Zone %s] Valve CLOSED — Firebase write: %s\n", z.id, ok ? "ok" : fbdo.errorReason().c_str());
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +373,8 @@ void handleCommand(int zoneIdx, const String& action) {
   } else if (action == "CLOSE") {
     closeValve(zoneIdx);
     scheduleCloseAt[zoneIdx] = 0;
-    Firebase.setString(fbdo, cmdBase + "/action", "null");
+    bool cleared = Firebase.setString(fbdo, cmdBase + "/action", "null");
+    Serial.printf("[Zone %s] Command cleared: %s\n", zones[zoneIdx].id, cleared ? "ok" : fbdo.errorReason().c_str());
   }
   lastFirebaseOkMs = millis();
 }
@@ -583,21 +594,20 @@ void setup() {
       }
     }
 
-    // Sync valve state from Firebase — prevents stale OPEN state after reboot
-    // On cold start z.valveOpen = false, but Firebase may still show OPEN from previous session.
-    // Reading here ensures closeValve() doesn't bail out early on the first CLOSE command.
+    // Force all valves CLOSED on boot — prevents stale OPEN state after reboot
     for (int i = 0; i < 2; i++) {
+      digitalWrite(zones[i].relayPin, HIGH);  // hardware close first — always
+      zones[i].valveOpen   = false;
+      scheduleCloseAt[i]   = 0;
+
       String statePath = zonePath(zones[i].id) + "/valve/state";
+      bool wasOpen = false;
       if (Firebase.getString(fbdo, statePath)) {
-        bool wasOpen = fbdo.stringData() == "OPEN";
-        zones[i].valveOpen = wasOpen;
-        // Always force relay to CLOSED on boot regardless of prior state — safety rule
-        digitalWrite(zones[i].relayPin, HIGH);
-        if (wasOpen) {
-          Firebase.setString(fbdo, statePath, "CLOSED");
-          Serial.printf("[Zone %s] Was OPEN in Firebase — forced CLOSED on boot\n", zones[i].id);
-        }
+        wasOpen = fbdo.stringData() == "OPEN";
       }
+      Firebase.setString(fbdo, statePath, "CLOSED");
+      Serial.printf("[Zone %s] Boot: relay CLOSED | Firebase was %s — now CLOSED\n",
+        zones[i].id, wasOpen ? "OPEN" : "CLOSED");
     }
 
     // Initial sensor read + heartbeat

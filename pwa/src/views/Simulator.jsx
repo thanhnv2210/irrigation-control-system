@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ref, set, push, get, update } from 'firebase/database'
+import { ref, set, push, get, update, onValue } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
@@ -376,12 +376,35 @@ function DataSeeder() {
 // ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
+function DeviceOnlineWarning() {
+  const { sitePath } = useSite()
+  const [online, setOnline] = useState(false)
+
+  useEffect(() => {
+    const unsub = onValue(ref(db, sitePath('devices/esp32-01/lastSeen')), snap => {
+      const lastSeen = snap.val()
+      setOnline(lastSeen && (Date.now() - lastSeen) < 90000)
+    })
+    return unsub
+  }, [sitePath])
+
+  if (!online) return null
+
+  return (
+    <div style={styles.warning}>
+      Real device is online. Simulator actions write directly to Firebase and will conflict with firmware.
+      Use the Control tab to send commands instead.
+    </div>
+  )
+}
+
 export default function Simulator() {
   return (
     <div style={styles.page}>
       <p style={styles.pageNote}>
         Simulates ESP32 behavior in the browser. Use while waiting for hardware.
       </p>
+      <DeviceOnlineWarning />
       <DeviceSimulator />
       <AdHocActions />
       <ScheduleTrigger />
@@ -413,5 +436,6 @@ const styles = {
   smallBtn:      { padding: '0.55rem 0.85rem', borderRadius: '8px', border: 'none', color: '#fff', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' },
   scheduleRow:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   scheduleTime:  { color: '#a0c8b0', fontSize: '0.88rem' },
+  warning:       { background: '#3d1f1f', border: '1px solid #e05c3a', borderRadius: '8px', color: '#e05c3a', fontSize: '0.85rem', padding: '0.75rem 1rem', lineHeight: 1.5 },
   dateInput:     { flex: 1, background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.6rem 0.75rem', color: '#e0f0e8', fontSize: '0.95rem', outline: 'none', colorScheme: 'dark' },
 }
