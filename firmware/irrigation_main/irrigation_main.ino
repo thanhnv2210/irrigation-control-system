@@ -583,6 +583,23 @@ void setup() {
       }
     }
 
+    // Sync valve state from Firebase — prevents stale OPEN state after reboot
+    // On cold start z.valveOpen = false, but Firebase may still show OPEN from previous session.
+    // Reading here ensures closeValve() doesn't bail out early on the first CLOSE command.
+    for (int i = 0; i < 2; i++) {
+      String statePath = zonePath(zones[i].id) + "/valve/state";
+      if (Firebase.getString(fbdo, statePath)) {
+        bool wasOpen = fbdo.stringData() == "OPEN";
+        zones[i].valveOpen = wasOpen;
+        // Always force relay to CLOSED on boot regardless of prior state — safety rule
+        digitalWrite(zones[i].relayPin, HIGH);
+        if (wasOpen) {
+          Firebase.setString(fbdo, statePath, "CLOSED");
+          Serial.printf("[Zone %s] Was OPEN in Firebase — forced CLOSED on boot\n", zones[i].id);
+        }
+      }
+    }
+
     // Initial sensor read + heartbeat
     readAndPublishSensors();
     publishHeartbeat();
