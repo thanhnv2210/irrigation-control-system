@@ -525,6 +525,12 @@ void setup() {
     Firebase.setStreamCallback(streamZ1, streamCallbackZ1, streamTimeoutCallback);
     Firebase.setStreamCallback(streamZ2, streamCallbackZ2, streamTimeoutCallback);
 
+    // Register device name if not already set — user can rename via PWA
+    if (!Firebase.getString(fbdo, devicePath() + "/name") || fbdo.stringData().length() == 0) {
+      Firebase.setString(fbdo, devicePath() + "/name", DEVICE_NAME);
+      Serial.println("[Device] Name registered: " DEVICE_NAME);
+    }
+
     // Register zone meta if not already present — enables PWA to discover zones
     for (int i = 0; i < 2; i++) {
       String metaPath = zonePath(zones[i].id) + "/meta";

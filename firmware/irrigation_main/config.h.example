@@ -25,6 +25,9 @@
 // Device ID (unique per physical ESP32)
 #define DEVICE_ID             "esp32-01"
 
+// Device display name — shown in PWA, user can rename via UI
+#define DEVICE_NAME           "Irrigation Controller"
+
 // Firmware version
 #define FIRMWARE_VERSION      "1.0.0"
 
