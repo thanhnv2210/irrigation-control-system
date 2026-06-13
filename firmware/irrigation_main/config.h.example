@@ -9,6 +9,11 @@
 #define FIREBASE_PASSWORD     "your-password"
 #define FIREBASE_DB_URL       "your-project-default-rtdb.region.firebasedatabase.app"
 
+// WiFi credentials — used as fallback if no credentials saved in flash
+// Leave empty ("") to require provisioning via captive portal
+#define WIFI_SSID             "your-wifi-ssid"
+#define WIFI_PASSWORD         "your-wifi-password"
+
 // Site ID — must match the key under irrigation/sites/ in Firebase
 // Find this in the PWA Settings tab (shown in the site list URL or browser storage)
 #define SITE_ID               "default"

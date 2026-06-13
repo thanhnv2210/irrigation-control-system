@@ -440,6 +440,13 @@ void setup() {
   wifiPassword = preferences.getString("pass", "");
   preferences.end();
 
+  // Fall back to compile-time credentials if flash has nothing
+  if (wifiSSID.length() == 0 && strlen(WIFI_SSID) > 0) {
+    wifiSSID     = WIFI_SSID;
+    wifiPassword = WIFI_PASSWORD;
+    Serial.println("[WiFi] No saved credentials — using config.h defaults");
+  }
+
   if (wifiSSID.length() > 0) {
     Serial.printf("[WiFi] Connecting to %s ...\n", wifiSSID.c_str());
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
@@ -517,6 +524,16 @@ void setup() {
 
     Firebase.setStreamCallback(streamZ1, streamCallbackZ1, streamTimeoutCallback);
     Firebase.setStreamCallback(streamZ2, streamCallbackZ2, streamTimeoutCallback);
+
+    // Register zone meta if not already present — enables PWA to discover zones
+    for (int i = 0; i < 2; i++) {
+      String metaPath = zonePath(zones[i].id) + "/meta";
+      if (!Firebase.getString(fbdo, metaPath + "/name") || fbdo.stringData().length() == 0) {
+        Firebase.setString(fbdo, metaPath + "/name",    zones[i].id);
+        Firebase.setBool  (fbdo, metaPath + "/enabled", true);
+        Serial.printf("[Zone %s] Meta registered\n", zones[i].id);
+      }
+    }
 
     // Initial sensor read + heartbeat
     readAndPublishSensors();
