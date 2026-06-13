@@ -346,14 +346,24 @@ void publishHeartbeat() {
 // Command handler (called from stream callbacks)
 // ---------------------------------------------------------------------------
 void handleCommand(int zoneIdx, const String& action) {
-  String clearPath = zonePath(zones[zoneIdx].id) + "/command/action";
+  String cmdBase  = zonePath(zones[zoneIdx].id) + "/command";
 
   if (action == "OPEN") {
+    // Read durationMinutes from command — default 2 min, clamp 1–9
+    int durationMinutes = 2;
+    if (Firebase.getInt(fbdo, cmdBase + "/durationMinutes")) {
+      int val = fbdo.intData();
+      if (val >= 1 && val <= 9) durationMinutes = val;
+    }
+
     openValve(zoneIdx, "manual");
-    Firebase.setString(fbdo, clearPath, "null");  // clear command
+    scheduleCloseAt[zoneIdx] = millis() + (uint32_t)durationMinutes * 60000UL;
+    Serial.printf("[Zone %s] Manual open for %d min\n", zones[zoneIdx].id, durationMinutes);
+    Firebase.setString(fbdo, cmdBase + "/action", "null");  // clear command
   } else if (action == "CLOSE") {
     closeValve(zoneIdx);
-    Firebase.setString(fbdo, clearPath, "null");
+    scheduleCloseAt[zoneIdx] = 0;
+    Firebase.setString(fbdo, cmdBase + "/action", "null");
   }
   lastFirebaseOkMs = millis();
 }
@@ -433,6 +443,38 @@ void setup() {
   // ADC pins (input by default, explicit for clarity)
   pinMode(SENSOR_1_PIN, INPUT);
   pinMode(SENSOR_2_PIN, INPUT);
+
+  // --- Boot config dump ---
+  Serial.println("[Config] ========== Current Configuration ==========");
+  Serial.printf ("[Config] Firmware version : %s\n",   FIRMWARE_VERSION);
+  Serial.printf ("[Config] Device ID        : %s\n",   DEVICE_ID);
+  Serial.printf ("[Config] Device name      : %s\n",   DEVICE_NAME);
+  Serial.printf ("[Config] Site ID          : %s\n",   SITE_ID);
+  Serial.printf ("[Config] Zone 1           : %s\n",   ZONE_1_ID);
+  Serial.printf ("[Config] Zone 2           : %s\n",   ZONE_2_ID);
+  Serial.printf ("[Config] WiFi SSID        : %s\n",   WIFI_SSID);
+  Serial.printf ("[Config] Sensor 1 pin     : GPIO %d\n", SENSOR_1_PIN);
+  Serial.printf ("[Config] Sensor 2 pin     : GPIO %d\n", SENSOR_2_PIN);
+  Serial.printf ("[Config] Relay 1 pin      : GPIO %d\n", RELAY_1_PIN);
+  Serial.printf ("[Config] Relay 2 pin      : GPIO %d\n", RELAY_2_PIN);
+  Serial.printf ("[Config] DRY_RAW_1        : %d\n",   DRY_RAW_1);
+  Serial.printf ("[Config] WET_RAW_1        : %d\n",   WET_RAW_1);
+  Serial.printf ("[Config] DRY_RAW_2        : %d\n",   DRY_RAW_2);
+  Serial.printf ("[Config] WET_RAW_2        : %d\n",   WET_RAW_2);
+  Serial.printf ("[Config] MAX_VALVE_MS     : %lu ms\n", MAX_VALVE_MS);
+  Serial.printf ("[Config] SENSOR_INTERVAL  : %lu ms\n", SENSOR_INTERVAL_MS);
+  Serial.printf ("[Config] TIMEZONE_OFFSET  : %d sec\n", TIMEZONE_OFFSET_SEC);
+#if DEBUG_PRINT_SECRETS
+  Serial.println("[Config] --- Sensitive values (DEBUG_PRINT_SECRETS=1) ---");
+  Serial.printf ("[Config] WiFi password    : %s\n",   WIFI_PASSWORD);
+  Serial.printf ("[Config] Firebase API key : %s\n",   FIREBASE_API_KEY);
+  Serial.printf ("[Config] Firebase email   : %s\n",   FIREBASE_EMAIL);
+  Serial.printf ("[Config] Firebase password: %s\n",   FIREBASE_PASSWORD);
+  Serial.printf ("[Config] Firebase DB URL  : %s\n",   FIREBASE_DB_URL);
+#else
+  Serial.println("[Config] Sensitive values hidden (set DEBUG_PRINT_SECRETS=1 to reveal)");
+#endif
+  Serial.println("[Config] ================================================");
 
   // --- WiFi provisioning ---
   preferences.begin("wifi", true);

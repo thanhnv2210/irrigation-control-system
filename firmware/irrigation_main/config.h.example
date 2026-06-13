@@ -31,6 +31,9 @@
 // Firmware version
 #define FIRMWARE_VERSION      "1.0.0"
 
+// Set to 1 to print sensitive values (API key, passwords) in boot log — use only for debugging
+#define DEBUG_PRINT_SECRETS   0
+
 // GPIO pins
 #define SENSOR_1_PIN          34   // ADC1 — zone 1 soil moisture
 #define SENSOR_2_PIN          35   // ADC1 — zone 2 soil moisture
