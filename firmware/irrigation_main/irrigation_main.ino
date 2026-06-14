@@ -655,6 +655,45 @@ void setup() {
 }
 
 // ---------------------------------------------------------------------------
+// WiFi reconnect — monitors connection and reconnects if lost
+// ---------------------------------------------------------------------------
+static uint32_t lastWifiCheckMs   = 0;
+static bool     wifiWasConnected  = false;
+
+void checkWifi() {
+  bool connected = WiFi.status() == WL_CONNECTED;
+
+  if (!connected) {
+    if (wifiWasConnected) {
+      Serial.println("[WiFi] Connection lost — attempting reconnect...");
+    }
+    WiFi.disconnect();
+    WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+
+    uint32_t startMs = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startMs < 15000) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("[WiFi] Reconnected, IP: %s | RSSI: %d dBm\n",
+        WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      wifiWasConnected = true;
+    } else {
+      Serial.printf("[WiFi] Reconnect failed (status %d) — will retry\n", WiFi.status());
+      wifiWasConnected = false;
+    }
+  } else {
+    if (!wifiWasConnected) {
+      Serial.printf("[WiFi] Connected, IP: %s | RSSI: %d dBm\n",
+        WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    }
+    wifiWasConnected = true;
+  }
+}
+
 // Stream health check — restart any stream that has dropped
 // ---------------------------------------------------------------------------
 static uint32_t lastStreamCheckMs = 0;
@@ -715,6 +754,12 @@ void loop() {
   if (millis() - lastScheduleCheckMs >= 60000UL) {
     lastScheduleCheckMs = millis();
     checkSchedules();
+  }
+
+  // WiFi check every 30 seconds
+  if (millis() - lastWifiCheckMs >= 30000UL) {
+    lastWifiCheckMs = millis();
+    checkWifi();
   }
 
   // Stream health check every 10 seconds
