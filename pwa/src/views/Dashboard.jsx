@@ -129,10 +129,12 @@ function DeviceStatus({ deviceId }) {
 }
 
 export default function Dashboard() {
-  const { zones } = useSite()
+  const { zones, devices } = useSite()
   return (
     <div style={styles.page}>
-      <DeviceStatus deviceId="esp32-01" />
+      {devices.map(d => (
+        <DeviceStatus key={d.id} deviceId={d.id} />
+      ))}
       {zones.length === 0 && (
         <p style={styles.empty}>No zones configured for this site.</p>
       )}

@@ -35,8 +35,8 @@ export default function Alerts() {
   const [saving,         setSaving]         = useState(false)
   const [testStatus,     setTestStatus]     = useState('')
 
-  const { sitePath, zones } = useSite()
-  const device = useDeviceData('esp32-01')
+  const { sitePath, zones, devices } = useSite()
+  const device = useDeviceData(devices[0]?.id ?? 'esp32-01')
   const offlineThresholdMs = offlineMinutes * 60 * 1000
   const isOnline  = device?.lastSeen && Date.now() - device.lastSeen < offlineThresholdMs
   const lastSeenStr = device?.lastSeen

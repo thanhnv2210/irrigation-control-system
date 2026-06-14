@@ -68,8 +68,8 @@ function LoginScreen({ onLogin }) {
 }
 
 function AlertMonitor() {
-  useAlertMonitor()
-  return null
+  const zoneMonitors = useAlertMonitor()
+  return <>{zoneMonitors}</>
 }
 
 function SiteSwitcher() {

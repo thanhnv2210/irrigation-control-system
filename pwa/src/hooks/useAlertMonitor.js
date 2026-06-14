@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, createElement } from 'react'
 import { ref, onValue } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData, useDeviceData } from './useZoneData'
@@ -22,18 +22,45 @@ function getLastAlert(key) { return parseInt(localStorage.getItem(`irrigAlert_${
 function setLastAlert(key) { localStorage.setItem(`irrigAlert_${key}`, Date.now().toString()) }
 function clearLastAlert(key) { localStorage.removeItem(`irrigAlert_${key}`) }
 
+function ZoneAlertMonitor({ zone, settings, siteId }) {
+  const { sensor } = useZoneData(zone.id)
+  const moisture = sensor?.moisturePercent
+  const prevAbove = useRef(true)
+
+  useEffect(() => {
+    prevAbove.current = true
+  }, [siteId])
+
+  useEffect(() => {
+    const cfg = settings
+    if (!cfg?.telegram?.token || !cfg?.telegram?.chatId || moisture == null) return
+    const zoneCfg   = cfg.zones?.[zone.id] ?? {}
+    const enabled   = zoneCfg.enabled !== false
+    const threshold = zoneCfg.threshold ?? 30
+    const isLow     = moisture < threshold
+    const wasAbove  = prevAbove.current
+    if (enabled && isLow && wasAbove) {
+      if (Date.now() - getLastAlert(`${siteId}_${zone.id}`) > COOLDOWN_MS) {
+        sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
+          `⚠️ <b>Low Moisture Alert</b>\n\nZone: <b>${zone.label}</b>\nMoisture: <b>${moisture}%</b> (threshold: ${threshold}%)\nTime: ${new Date().toLocaleString()}\n\n💧 Consider checking the irrigation schedule.`)
+        setLastAlert(`${siteId}_${zone.id}`)
+      }
+    }
+    prevAbove.current = !isLow
+  }, [moisture, settings, siteId, zone.id, zone.label])
+
+  return null
+}
+
 export function useAlertMonitor() {
-  const { sitePath, siteId } = useSite()
+  const { sitePath, siteId, zones, devices } = useSite()
   const [settings, setSettings] = useState(null)
-  const balcony = useZoneData('balcony')
-  const garden  = useZoneData('garden')
-  const device  = useDeviceData('esp32-01')
-  const deviceName = device?.name || 'esp32-01'
+  const device  = useDeviceData(devices[0]?.id ?? 'esp32-01')
+  const deviceName = device?.name || devices[0]?.id || 'esp32-01'
 
   const settingsRef     = useRef(null)
   const lastSeenRef     = useRef(null)
   const deviceWasOnline = useRef(null)
-  const prevAbove       = useRef({ balcony: true, garden: true })
 
   useEffect(() => { settingsRef.current = settings }, [settings])
   useEffect(() => { lastSeenRef.current = device?.lastSeen }, [device?.lastSeen])
@@ -47,37 +74,8 @@ export function useAlertMonitor() {
 
   // Reset state when switching sites
   useEffect(() => {
-    prevAbove.current       = { balcony: true, garden: true }
     deviceWasOnline.current = null
   }, [siteId])
-
-  const balconyMoisture = balcony.sensor?.moisturePercent
-  const gardenMoisture  = garden.sensor?.moisturePercent
-
-  useEffect(() => {
-    const cfg = settings
-    if (!cfg?.telegram?.token || !cfg?.telegram?.chatId) return
-    const checks = [
-      { id: 'balcony', label: 'Balcony', moisture: balconyMoisture },
-      { id: 'garden',  label: 'Garden',  moisture: gardenMoisture  },
-    ]
-    for (const { id, label, moisture } of checks) {
-      if (moisture == null) continue
-      const zoneCfg   = cfg.zones?.[id] ?? {}
-      const enabled   = zoneCfg.enabled !== false
-      const threshold = zoneCfg.threshold ?? 30
-      const isLow     = moisture < threshold
-      const wasAbove  = prevAbove.current[id]
-      if (enabled && isLow && wasAbove) {
-        if (Date.now() - getLastAlert(`${siteId}_${id}`) > COOLDOWN_MS) {
-          sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
-            `⚠️ <b>Low Moisture Alert</b>\n\nZone: <b>${label}</b>\nMoisture: <b>${moisture}%</b> (threshold: ${threshold}%)\nTime: ${new Date().toLocaleString()}\n\n💧 Consider checking the irrigation schedule.`)
-          setLastAlert(`${siteId}_${id}`)
-        }
-      }
-      prevAbove.current[id] = !isLow
-    }
-  }, [balconyMoisture, gardenMoisture, settings, siteId])
 
   useEffect(() => {
     function checkDevice() {
@@ -107,4 +105,9 @@ export function useAlertMonitor() {
     const timer = setInterval(checkDevice, 60 * 1000)
     return () => clearInterval(timer)
   }, [siteId])
+
+  // Return zone monitors — caller renders these to trigger per-zone alerts
+  return zones.map(zone =>
+    createElement(ZoneAlertMonitor, { key: zone.id, zone, settings, siteId })
+  )
 }
