@@ -33,6 +33,7 @@ export default function Alerts() {
   const [offlineMinutes, setOfflineMinutes] = useState(5)
   const [offlineEnabled, setOfflineEnabled] = useState(false)
   const [saving,         setSaving]         = useState(false)
+  const [saveError,      setSaveError]      = useState('')
   const [testStatus,     setTestStatus]     = useState('')
 
   const { sitePath, zones, devices } = useSite()
@@ -42,6 +43,20 @@ export default function Alerts() {
   const lastSeenStr = device?.lastSeen
     ? new Date(device.lastSeen).toLocaleTimeString()
     : '—'
+
+  // Always seed defaults from zones so sliders/save work before settings exist
+  useEffect(() => {
+    setThresholds(prev => {
+      const th = {}
+      for (const z of zones) th[z.id] = prev[z.id] ?? 30
+      return th
+    })
+    setEnabled(prev => {
+      const en = {}
+      for (const z of zones) en[z.id] = prev[z.id] !== false
+      return en
+    })
+  }, [zones])
 
   useEffect(() => {
     const unsub = onValue(ref(db, sitePath('settings/alerts')), snap => {
@@ -65,6 +80,7 @@ export default function Alerts() {
 
   async function save() {
     setSaving(true)
+    setSaveError('')
     const data = {
       telegram: { token: token.trim(), chatId: chatId.trim() },
       offlineMinutes: Number(offlineMinutes),
@@ -72,10 +88,15 @@ export default function Alerts() {
       zones: {}
     }
     for (const z of zones) {
-      data.zones[z.id] = { threshold: Number(thresholds[z.id]), enabled: enabled[z.id] }
+      data.zones[z.id] = { threshold: Number(thresholds[z.id]) || 30, enabled: enabled[z.id] !== false }
     }
-    await set(ref(db, sitePath('settings/alerts')), data)
-    setSaving(false)
+    try {
+      await set(ref(db, sitePath('settings/alerts')), data)
+    } catch (err) {
+      setSaveError(err.message ?? 'Save failed')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function sendTest() {
@@ -129,6 +150,7 @@ export default function Alerts() {
             {testStatus === 'ok' ? 'Sent ✓' : testStatus === 'fail' ? 'Failed ✗' : 'Test'}
           </button>
         </div>
+        {saveError && <p style={{ color: '#e05c3a', fontSize: '0.8rem', margin: 0 }}>{saveError}</p>}
       </div>
 
       {/* Device offline */}
