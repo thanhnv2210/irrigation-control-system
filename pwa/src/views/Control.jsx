@@ -6,15 +6,24 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
 
-const MIN_DURATION = 1
-const MAX_DURATION = 9
-const DEFAULT_DURATION = 2
+const MIN_SECONDS     = 30       // 30 seconds minimum
+const MAX_SECONDS     = 9 * 60  // 9 minutes maximum
+const DEFAULT_SECONDS = 30      // default: 0 min 30 sec
+const STEP_SECONDS    = 30      // increment/decrement in 30s steps
+
+function formatDuration(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  if (m === 0) return `${s}s`
+  if (s === 0) return `${m}m`
+  return `${m}m ${s}s`
+}
 
 function ZoneControl({ zoneId, label }) {
   const { valve, command } = useZoneData(zoneId)
   const { sitePath } = useSite()
-  const [pending,  setPending]  = useState(null)
-  const [duration, setDuration] = useState(DEFAULT_DURATION)
+  const [pending,        setPending]        = useState(null)
+  const [durationSeconds, setDurationSeconds] = useState(DEFAULT_SECONDS)
 
   const isOpen     = valve?.state === 'OPEN'
   const hasPending = command?.action && command.action !== 'null'
@@ -22,11 +31,11 @@ function ZoneControl({ zoneId, label }) {
   async function sendCommand(action) {
     await set(ref(db, sitePath(`zones/${zoneId}/command`)), {
       action,
-      durationMinutes: action === 'OPEN' ? duration : null,
+      durationSeconds: action === 'OPEN' ? durationSeconds : null,
       issuedAt: serverTimestamp(),
       issuedBy: 'app'
     })
-    logAudit(sitePath, 'VALVE_COMMAND', zoneId, { action, durationMinutes: duration })
+    logAudit(sitePath, 'VALVE_COMMAND', zoneId, { action, durationSeconds })
   }
 
   function handlePress(action) {
@@ -57,14 +66,14 @@ function ZoneControl({ zoneId, label }) {
         <div style={styles.durationControls}>
           <button
             style={styles.durationBtn}
-            disabled={duration <= MIN_DURATION}
-            onClick={() => setDuration(d => Math.max(MIN_DURATION, d - 1))}
+            disabled={durationSeconds <= MIN_SECONDS}
+            onClick={() => setDurationSeconds(d => Math.max(MIN_SECONDS, d - STEP_SECONDS))}
           >−</button>
-          <span style={styles.durationValue}>{duration} min</span>
+          <span style={styles.durationValue}>{formatDuration(durationSeconds)}</span>
           <button
             style={styles.durationBtn}
-            disabled={duration >= MAX_DURATION}
-            onClick={() => setDuration(d => Math.min(MAX_DURATION, d + 1))}
+            disabled={durationSeconds >= MAX_SECONDS}
+            onClick={() => setDurationSeconds(d => Math.min(MAX_SECONDS, d + STEP_SECONDS))}
           >+</button>
         </div>
       </div>
@@ -88,7 +97,7 @@ function ZoneControl({ zoneId, label }) {
 
       {pending && (
         <ConfirmDialog
-          message={`Open the ${label} valve for ${duration} minute${duration > 1 ? 's' : ''}?`}
+          message={`Open the ${label} valve for ${formatDuration(durationSeconds)}?`}
           onConfirm={() => { sendCommand(pending.action); setPending(null) }}
           onCancel={() => setPending(null)}
         />
@@ -102,7 +111,7 @@ export default function Control() {
   return (
     <div style={styles.page}>
       <p style={styles.note}>
-        OPEN commands require confirmation. Set duration (1–9 min) before opening.
+        OPEN commands require confirmation. Set duration (30s–9m, in 30s steps) before opening.
       </p>
       {zones.length === 0 && (
         <p style={styles.empty}>No zones configured for this site.</p>

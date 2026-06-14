@@ -359,16 +359,16 @@ void handleCommand(int zoneIdx, const String& action) {
   String cmdBase  = zonePath(zones[zoneIdx].id) + "/command";
 
   if (action == "OPEN") {
-    // Read durationMinutes from command — default 2 min, clamp 1–9
-    int durationMinutes = 2;
-    if (Firebase.getInt(fbdo, cmdBase + "/durationMinutes")) {
+    // Read durationSeconds from command — default 30s, clamp 30–540s (9 min)
+    int durationSeconds = 30;
+    if (Firebase.getInt(fbdo, cmdBase + "/durationSeconds")) {
       int val = fbdo.intData();
-      if (val >= 1 && val <= 9) durationMinutes = val;
+      if (val >= 30 && val <= 540) durationSeconds = val;
     }
 
     openValve(zoneIdx, "manual");
-    scheduleCloseAt[zoneIdx] = millis() + (uint32_t)durationMinutes * 60000UL;
-    Serial.printf("[Zone %s] Manual open for %d min\n", zones[zoneIdx].id, durationMinutes);
+    scheduleCloseAt[zoneIdx] = millis() + (uint32_t)durationSeconds * 1000UL;
+    Serial.printf("[Zone %s] Manual open for %ds\n", zones[zoneIdx].id, durationSeconds);
     Firebase.setString(fbdo, cmdBase + "/action", "null");  // clear command
   } else if (action == "CLOSE") {
     closeValve(zoneIdx);
