@@ -594,18 +594,31 @@ void setup() {
       }
     }
 
-    // Force all valves CLOSED on boot — prevents stale OPEN state after reboot
+    // Force all valves CLOSED and clear any pending commands on boot
     for (int i = 0; i < 2; i++) {
       digitalWrite(zones[i].relayPin, HIGH);  // hardware close first — always
       zones[i].valveOpen   = false;
       scheduleCloseAt[i]   = 0;
 
       String statePath = zonePath(zones[i].id) + "/valve/state";
+      String cmdPath   = zonePath(zones[i].id) + "/command/action";
+
       bool wasOpen = false;
       if (Firebase.getString(fbdo, statePath)) {
         wasOpen = fbdo.stringData() == "OPEN";
       }
       Firebase.setString(fbdo, statePath, "CLOSED");
+
+      // Clear any stale pending command — prevents PWA showing "waiting for device"
+      String pendingCmd = "";
+      if (Firebase.getString(fbdo, cmdPath)) {
+        pendingCmd = fbdo.stringData();
+      }
+      if (pendingCmd.length() > 0 && pendingCmd != "null") {
+        Firebase.setString(fbdo, cmdPath, "null");
+        Serial.printf("[Zone %s] Boot: cleared stale command '%s'\n", zones[i].id, pendingCmd.c_str());
+      }
+
       Serial.printf("[Zone %s] Boot: relay CLOSED | Firebase was %s — now CLOSED\n",
         zones[i].id, wasOpen ? "OPEN" : "CLOSED");
     }
