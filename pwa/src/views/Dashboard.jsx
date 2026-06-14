@@ -130,15 +130,34 @@ function DeviceStatus({ deviceId }) {
 
 export default function Dashboard() {
   const { zones, devices } = useSite()
+
+  // Group zones by deviceId — zones with no deviceId fall under 'unassigned'
+  const zonesByDevice = zones.reduce((acc, z) => {
+    const key = z.deviceId || 'unassigned'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(z)
+    return acc
+  }, {})
+
+  // Devices that have zones registered
+  const activeDevices = devices.filter(d => zonesByDevice[d.id])
+  // Zones not linked to any known device
+  const unassigned = zonesByDevice['unassigned'] || []
+
   return (
     <div style={styles.page}>
-      {devices.map(d => (
-        <DeviceStatus key={d.id} deviceId={d.id} />
-      ))}
-      {zones.length === 0 && (
-        <p style={styles.empty}>No zones configured for this site.</p>
+      {devices.length === 0 && zones.length === 0 && (
+        <p style={styles.empty}>No devices or zones configured for this site.</p>
       )}
-      {zones.map(z => (
+      {activeDevices.map(d => (
+        <div key={d.id} style={styles.deviceGroup}>
+          <DeviceStatus deviceId={d.id} />
+          {zonesByDevice[d.id].map(z => (
+            <ZoneCard key={z.id} zoneId={z.id} label={z.label} />
+          ))}
+        </div>
+      ))}
+      {unassigned.map(z => (
         <ZoneCard key={z.id} zoneId={z.id} label={z.label} />
       ))}
     </div>
@@ -146,7 +165,8 @@ export default function Dashboard() {
 }
 
 const styles = {
-  page:         { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
+  page:         { display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem' },
+  deviceGroup:  { display: 'flex', flexDirection: 'column', gap: '0.75rem', background: '#0f1f15', borderRadius: '14px', padding: '0.75rem' },
   card:         { background: '#1e2d24', borderRadius: '12px', padding: '1.25rem' },
   cardHeader:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem' },
   nameRow:      { display: 'flex', alignItems: 'center', gap: '0.4rem' },

@@ -30,7 +30,7 @@ export function SiteProvider({ children }) {
       if (!val) { setZones([]); return }
       const list = Object.entries(val)
         .filter(([, z]) => z?.meta)
-        .map(([id, z]) => ({ id, label: z.meta?.name || id }))
+        .map(([id, z]) => ({ id, label: z.meta?.name || id, deviceId: z.meta?.deviceId || null }))
       setZones(list)
     })
     return unsub

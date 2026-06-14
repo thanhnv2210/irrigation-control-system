@@ -588,9 +588,13 @@ void setup() {
     for (int i = 0; i < 2; i++) {
       String metaPath = zonePath(zones[i].id) + "/meta";
       if (!Firebase.getString(fbdo, metaPath + "/name") || fbdo.stringData().length() == 0) {
-        Firebase.setString(fbdo, metaPath + "/name",    zones[i].id);
-        Firebase.setBool  (fbdo, metaPath + "/enabled", true);
+        Firebase.setString(fbdo, metaPath + "/name",     zones[i].id);
+        Firebase.setBool  (fbdo, metaPath + "/enabled",  true);
+        Firebase.setString(fbdo, metaPath + "/deviceId", DEVICE_ID);
         Serial.printf("[Zone %s] Meta registered\n", zones[i].id);
+      } else {
+        // Always update deviceId in case board was reassigned
+        Firebase.setString(fbdo, metaPath + "/deviceId", DEVICE_ID);
       }
     }
 
