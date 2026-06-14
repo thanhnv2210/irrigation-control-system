@@ -135,18 +135,26 @@ static String devicePath() {
 // ---------------------------------------------------------------------------
 void openValve(int zoneIdx, const char* openedBy) {
   Zone& z = zones[zoneIdx];
-  if (z.valveOpen) return;
+  Serial.printf("[Zone %s] openValve() called — current valveOpen=%s\n", z.id, z.valveOpen ? "true" : "false");
+  if (z.valveOpen) {
+    Serial.printf("[Zone %s] Already open — skipping\n", z.id);
+    return;
+  }
 
   digitalWrite(z.relayPin, LOW);  // Active-LOW relay
   z.valveOpen     = true;
   z.valveOpenedAt = millis();
+  Serial.printf("[Zone %s] Relay pin %d set LOW (open)\n", z.id, z.relayPin);
 
   String base = zonePath(z.id);
-  Firebase.setString(fbdo, base + "/valve/state",         "OPEN");
-  Firebase.setString(fbdo, base + "/valve/openedBy",      openedBy);
-  Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
-
-  Serial.printf("[Zone %s] Valve OPEN (by %s)\n", z.id, openedBy);
+  bool ok1 = Firebase.setString(fbdo, base + "/valve/state",    "OPEN");
+  bool ok2 = Firebase.setString(fbdo, base + "/valve/openedBy", openedBy);
+  bool ok3 = Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
+  Serial.printf("[Zone %s] Valve OPEN (by %s) — Firebase writes: state=%s openedBy=%s ts=%s\n",
+    z.id, openedBy,
+    ok1 ? "ok" : fbdo.errorReason().c_str(),
+    ok2 ? "ok" : fbdo.errorReason().c_str(),
+    ok3 ? "ok" : fbdo.errorReason().c_str());
 }
 
 void closeValve(int zoneIdx) {
@@ -358,23 +366,34 @@ void publishHeartbeat() {
 void handleCommand(int zoneIdx, const String& action) {
   String cmdBase  = zonePath(zones[zoneIdx].id) + "/command";
 
+  Serial.printf("[Cmd] handleCommand zone=%s action=%s\n", zones[zoneIdx].id, action.c_str());
+
   if (action == "OPEN") {
     // Read durationSeconds from command — default 30s, clamp 30–540s (9 min)
     int durationSeconds = 30;
     if (Firebase.getInt(fbdo, cmdBase + "/durationSeconds")) {
       int val = fbdo.intData();
+      Serial.printf("[Cmd] durationSeconds from Firebase: %d\n", val);
       if (val >= 30 && val <= 540) durationSeconds = val;
+    } else {
+      Serial.printf("[Cmd] durationSeconds read failed: %s — using default 30s\n", fbdo.errorReason().c_str());
     }
 
     openValve(zoneIdx, "manual");
     scheduleCloseAt[zoneIdx] = millis() + (uint32_t)durationSeconds * 1000UL;
-    Serial.printf("[Zone %s] Manual open for %ds\n", zones[zoneIdx].id, durationSeconds);
-    Firebase.setString(fbdo, cmdBase + "/action", "null");  // clear command
+    Serial.printf("[Zone %s] Manual open for %ds, will close at millis=%lu\n",
+      zones[zoneIdx].id, durationSeconds, scheduleCloseAt[zoneIdx]);
+
+    bool cleared = Firebase.setString(fbdo, cmdBase + "/action", "null");
+    Serial.printf("[Cmd] OPEN command cleared: %s\n", cleared ? "ok" : fbdo.errorReason().c_str());
+
   } else if (action == "CLOSE") {
     closeValve(zoneIdx);
     scheduleCloseAt[zoneIdx] = 0;
     bool cleared = Firebase.setString(fbdo, cmdBase + "/action", "null");
-    Serial.printf("[Zone %s] Command cleared: %s\n", zones[zoneIdx].id, cleared ? "ok" : fbdo.errorReason().c_str());
+    Serial.printf("[Cmd] CLOSE command cleared: %s\n", cleared ? "ok" : fbdo.errorReason().c_str());
+  } else {
+    Serial.printf("[Cmd] Unknown action ignored: \"%s\"\n", action.c_str());
   }
   lastFirebaseOkMs = millis();
 }
@@ -698,19 +717,40 @@ void checkWifi() {
 // ---------------------------------------------------------------------------
 static uint32_t lastStreamCheckMs = 0;
 
+void pollCommand(int zoneIdx) {
+  String cmdPath = zonePath(zones[zoneIdx].id) + "/command/action";
+  Serial.printf("[Cmd] Polling %s → %s\n", zones[zoneIdx].id, cmdPath.c_str());
+  if (Firebase.getString(fbdo, cmdPath)) {
+    String action = fbdo.stringData();
+    action.trim();
+    Serial.printf("[Cmd] Poll result for %s: \"%s\"\n", zones[zoneIdx].id, action.c_str());
+    if (action.length() > 0 && action != "null") {
+      handleCommand(zoneIdx, action);
+    }
+  } else {
+    Serial.printf("[Cmd] Poll FAILED for %s: %s\n", zones[zoneIdx].id, fbdo.errorReason().c_str());
+  }
+}
+
 void checkStreams() {
   String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
   String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
 
-  if (!Firebase.readStream(streamZ1) || streamZ1.streamTimeout()) {
-    Serial.println("[Firebase] Stream Z1 dropped — restarting");
+  bool z1ok = Firebase.readStream(streamZ1) && !streamZ1.streamTimeout();
+  bool z2ok = Firebase.readStream(streamZ2) && !streamZ2.streamTimeout();
+  Serial.printf("[Stream] Z1=%s Z2=%s\n", z1ok ? "OK" : "DROPPED", z2ok ? "OK" : "DROPPED");
+
+  if (!z1ok) {
+    Serial.println("[Stream] Restarting Z1");
     Firebase.beginStream(streamZ1, cmdPath1);
     Firebase.setStreamCallback(streamZ1, streamCallbackZ1, streamTimeoutCallback);
+    pollCommand(0);
   }
-  if (!Firebase.readStream(streamZ2) || streamZ2.streamTimeout()) {
-    Serial.println("[Firebase] Stream Z2 dropped — restarting");
+  if (!z2ok) {
+    Serial.println("[Stream] Restarting Z2");
     Firebase.beginStream(streamZ2, cmdPath2);
     Firebase.setStreamCallback(streamZ2, streamCallbackZ2, streamTimeoutCallback);
+    pollCommand(1);
   }
 }
 
@@ -768,6 +808,18 @@ void loop() {
     if (Firebase.ready()) {
       checkStreams();
     }
+  }
+
+  // Command poll every 3 seconds — primary command mechanism, runs regardless of stream state
+  static uint32_t lastCmdPollMs = 0;
+  static uint32_t pollCount = 0;
+  if (millis() - lastCmdPollMs >= 3000UL) {
+    lastCmdPollMs = millis();
+    pollCount++;
+    Serial.printf("[Cmd] --- Poll #%lu | uptime %lus | Firebase.ready=%s ---\n",
+      pollCount, millis() / 1000, Firebase.ready() ? "YES" : "NO");
+    pollCommand(0);
+    pollCommand(1);
   }
 
   // Firebase watchdog
