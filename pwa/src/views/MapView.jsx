@@ -29,13 +29,13 @@ function svgToPct(sx, sy, svgW, svgH) {
 
 // ── Zone pin (SVG group) ──────────────────────────────────────────────────
 function ZonePin({ zone, svgW, svgH, onDragStart }) {
-  const { sensor, valve } = useZoneData(zone.id)
+  const { sensor, valve } = useZoneData({ zoneId: zone.id, deviceId: zone.deviceId })
   const { sitePath } = useSite()
   const [meta, setMeta]   = useState(null)
 
   useEffect(() => {
-    return onValue(ref(db, sitePath(`zones/${zone.id}/meta`)), snap => setMeta(snap.val()))
-  }, [zone.id, sitePath])
+    return onValue(ref(db, sitePath(`devices/${zone.deviceId}/zones/${zone.id}/meta`)), snap => setMeta(snap.val()))
+  }, [zone.id, zone.deviceId, sitePath])
 
   const pct       = sensor?.moisturePercent ?? null
   const valveOpen = valve?.state === 'OPEN'
@@ -115,7 +115,7 @@ export default function MapView() {
 
   useEffect(() => {
     const unsubs = zones.map(z =>
-      onValue(ref(db, sitePath(`zones/${z.id}/meta`)), snap =>
+      onValue(ref(db, sitePath(`devices/${z.deviceId}/zones/${z.id}/meta`)), snap =>
         setMetas(prev => ({ ...prev, [z.id]: snap.val() }))
       )
     )
@@ -166,7 +166,7 @@ export default function MapView() {
   async function savePos(zoneId, px, py) {
     const zone     = zones.find(z => z.id === zoneId)
     const existing = metas[zoneId] ?? {}
-    await set(ref(db, sitePath(`zones/${zoneId}/meta`)), {
+    await set(ref(db, sitePath(`devices/${zone.deviceId}/zones/${zoneId}/meta`)), {
       name:    existing.name    || zone.label,
       enabled: existing.enabled !== false,
       ...existing,

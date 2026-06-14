@@ -3,14 +3,15 @@ import { ref, query, orderByChild, limitToLast, startAt, endAt, onValue } from '
 import { db } from '../firebase'
 import { useSite } from '../context/SiteContext'
 
-export function useHistory(zoneId, limit = 48) {
+export function useHistory({ zoneId, deviceId }, limit = 48) {
   const { sitePath } = useSite()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!zoneId || !deviceId) return
     const histRef = query(
-      ref(db, sitePath(`zones/${zoneId}/history`)),
+      ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/history`)),
       orderByChild('timestamp'),
       limitToLast(limit)
     )
@@ -21,25 +22,25 @@ export function useHistory(zoneId, limit = 48) {
       setLoading(false)
     })
     return unsub
-  }, [zoneId, limit, sitePath])
+  }, [zoneId, deviceId, limit, sitePath])
 
   return { history, loading }
 }
 
-export function useHistoryByDate(zoneId, dateStr) {
+export function useHistoryByDate({ zoneId, deviceId }, dateStr) {
   const { sitePath } = useSite()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!dateStr) { setHistory([]); setLoading(false); return }
+    if (!dateStr || !zoneId || !deviceId) { setHistory([]); setLoading(false); return }
     setLoading(true)
     const [year, month, day] = dateStr.split('-').map(Number)
     const startTs = new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
     const endTs   = new Date(year, month - 1, day, 23, 59, 59, 999).getTime()
 
     const histRef = query(
-      ref(db, sitePath(`zones/${zoneId}/history`)),
+      ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/history`)),
       orderByChild('timestamp'),
       startAt(startTs),
       endAt(endTs)
@@ -51,7 +52,7 @@ export function useHistoryByDate(zoneId, dateStr) {
       setLoading(false)
     })
     return unsub
-  }, [zoneId, dateStr, sitePath])
+  }, [zoneId, deviceId, dateStr, sitePath])
 
   return { history, loading }
 }

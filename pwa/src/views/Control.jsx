@@ -19,8 +19,8 @@ function formatDuration(totalSeconds) {
   return `${m}m ${s}s`
 }
 
-function ZoneControl({ zoneId, label }) {
-  const { valve, command } = useZoneData(zoneId)
+function ZoneControl({ zoneId, deviceId, label }) {
+  const { valve, command } = useZoneData({ zoneId, deviceId })
   const { sitePath } = useSite()
   const [pending,        setPending]        = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(DEFAULT_SECONDS)
@@ -29,13 +29,13 @@ function ZoneControl({ zoneId, label }) {
   const hasPending = command?.action && command.action !== 'null'
 
   async function sendCommand(action) {
-    await set(ref(db, sitePath(`zones/${zoneId}/command`)), {
+    await set(ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/command`)), {
       action,
       durationSeconds: action === 'OPEN' ? durationSeconds : null,
       issuedAt: serverTimestamp(),
       issuedBy: 'app'
     })
-    logAudit(sitePath, 'VALVE_COMMAND', zoneId, { action, durationSeconds })
+    logAudit(sitePath, 'VALVE_COMMAND', `${deviceId}/${zoneId}`, { action, durationSeconds })
   }
 
   function handlePress(action) {
@@ -117,7 +117,7 @@ export default function Control() {
         <p style={styles.empty}>No zones configured for this site.</p>
       )}
       {zones.map(z => (
-        <ZoneControl key={z.id} zoneId={z.id} label={z.label} />
+        <ZoneControl key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />
       ))}
     </div>
   )

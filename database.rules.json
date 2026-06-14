@@ -17,63 +17,69 @@
     },
 
     // -----------------------------------------------------------------------
-    // Irrigation system — multi-site structure
+    // Irrigation system — multi-site, multi-device structure
+    // Schema: irrigation/sites/{site_id}/devices/{device_id}/meta + zones/
     // -----------------------------------------------------------------------
     "irrigation": {
-
-      // Site list — any owner can read and create sites
       "sites": {
         ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
         "$site_id": {
           ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
           ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
-          // Site metadata (name, etc.) — any owner reads/writes
+          // Site metadata
           "meta": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Device heartbeat — ESP32 or owner writes
+          // Devices — each device owns its meta heartbeat and zones
           "devices": {
             "$device_id": {
               ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-              ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-            }
-          },
+              ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
-          "zones": {
-            "$zone_id": {
-
+              // Device heartbeat — ESP32 or owner writes
               "meta": {
                 ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
-              },
-
-              "sensor": {
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
                 ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
               },
 
-              "history": {
-                ".indexOn": ["timestamp"],
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-                ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-              },
+              // Zones live under their device — no cross-board conflicts possible
+              "zones": {
+                "$zone_id": {
 
-              "valve": {
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-                ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
-              },
+                  "meta": {
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
+                  },
 
-              "command": {
-                ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
-              },
+                  "sensor": {
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  },
 
-              "schedule": {
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')",
-                ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  "history": {
+                    ".indexOn": ["timestamp"],
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  },
+
+                  "valve": {
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  },
+
+                  "command": {
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
+                  },
+
+                  "schedule": {
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')",
+                    ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  }
+                }
               }
             }
           },

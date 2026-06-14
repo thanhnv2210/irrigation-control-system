@@ -15,8 +15,8 @@ function MoistureGauge({ percent }) {
   )
 }
 
-function ZoneCard({ zoneId, label }) {
-  const { sensor, valve } = useZoneData(zoneId)
+function ZoneCard({ zoneId, deviceId, label }) {
+  const { sensor, valve } = useZoneData({ zoneId, deviceId })
   const { renameZone } = useSite()
   const [renaming,  setRenaming]  = useState(false)
   const [editName,  setEditName]  = useState('')
@@ -34,7 +34,7 @@ function ZoneCard({ zoneId, label }) {
   async function handleRename(e) {
     e.preventDefault()
     if (!editName.trim()) return
-    await renameZone(zoneId, editName.trim())
+    await renameZone(zoneId, deviceId, editName.trim())
     setRenaming(false)
   }
 
@@ -153,12 +153,12 @@ export default function Dashboard() {
         <div key={d.id} style={styles.deviceGroup}>
           <DeviceStatus deviceId={d.id} />
           {zonesByDevice[d.id].map(z => (
-            <ZoneCard key={z.id} zoneId={z.id} label={z.label} />
+            <ZoneCard key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />
           ))}
         </div>
       ))}
       {unassigned.map(z => (
-        <ZoneCard key={z.id} zoneId={z.id} label={z.label} />
+        <ZoneCard key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />
       ))}
     </div>
   )

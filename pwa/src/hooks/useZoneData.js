@@ -3,7 +3,7 @@ import { ref, onValue } from 'firebase/database'
 import { db } from '../firebase'
 import { useSite } from '../context/SiteContext'
 
-export function useZoneData(zoneId) {
+export function useZoneData({ zoneId, deviceId }) {
   const { sitePath } = useSite()
   const [sensor,   setSensor]   = useState(null)
   const [valve,    setValve]    = useState(null)
@@ -11,12 +11,14 @@ export function useZoneData(zoneId) {
   const [schedule, setSchedule] = useState({})
 
   useEffect(() => {
-    const unsubSensor   = onValue(ref(db, sitePath(`zones/${zoneId}/sensor`)),   snap => setSensor(snap.val()))
-    const unsubValve    = onValue(ref(db, sitePath(`zones/${zoneId}/valve`)),    snap => setValve(snap.val()))
-    const unsubCommand  = onValue(ref(db, sitePath(`zones/${zoneId}/command`)),  snap => setCommand(snap.val()))
-    const unsubSchedule = onValue(ref(db, sitePath(`zones/${zoneId}/schedule`)), snap => setSchedule(snap.val() ?? {}))
+    if (!zoneId || !deviceId) return
+    const base = sitePath(`devices/${deviceId}/zones/${zoneId}`)
+    const unsubSensor   = onValue(ref(db, `${base}/sensor`),   snap => setSensor(snap.val()))
+    const unsubValve    = onValue(ref(db, `${base}/valve`),    snap => setValve(snap.val()))
+    const unsubCommand  = onValue(ref(db, `${base}/command`),  snap => setCommand(snap.val()))
+    const unsubSchedule = onValue(ref(db, `${base}/schedule`), snap => setSchedule(snap.val() ?? {}))
     return () => { unsubSensor(); unsubValve(); unsubCommand(); unsubSchedule() }
-  }, [zoneId, sitePath])
+  }, [zoneId, deviceId, sitePath])
 
   return { sensor, valve, command, schedule }
 }
@@ -26,7 +28,8 @@ export function useDeviceData(deviceId) {
   const [device, setDevice] = useState(null)
 
   useEffect(() => {
-    const unsub = onValue(ref(db, sitePath(`devices/${deviceId}`)), snap => setDevice(snap.val()))
+    if (!deviceId) return
+    const unsub = onValue(ref(db, sitePath(`devices/${deviceId}/meta`)), snap => setDevice(snap.val()))
     return unsub
   }, [deviceId, sitePath])
 

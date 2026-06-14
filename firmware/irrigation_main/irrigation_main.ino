@@ -124,10 +124,10 @@ static uint32_t lastFirebaseOkMs = 0;  // tracks last successful Firebase call
 // Path helper — all data lives under irrigation/sites/{SITE_ID}/
 // ---------------------------------------------------------------------------
 static String zonePath(const char* zoneId) {
-  return String("irrigation/sites/") + SITE_ID + "/zones/" + zoneId;
+  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/zones/" + zoneId;
 }
 static String devicePath() {
-  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID;
+  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/meta";
 }
 
 // ---------------------------------------------------------------------------
@@ -588,13 +588,9 @@ void setup() {
     for (int i = 0; i < 2; i++) {
       String metaPath = zonePath(zones[i].id) + "/meta";
       if (!Firebase.getString(fbdo, metaPath + "/name") || fbdo.stringData().length() == 0) {
-        Firebase.setString(fbdo, metaPath + "/name",     zones[i].id);
-        Firebase.setBool  (fbdo, metaPath + "/enabled",  true);
-        Firebase.setString(fbdo, metaPath + "/deviceId", DEVICE_ID);
+        Firebase.setString(fbdo, metaPath + "/name",    zones[i].id);
+        Firebase.setBool  (fbdo, metaPath + "/enabled", true);
         Serial.printf("[Zone %s] Meta registered\n", zones[i].id);
-      } else {
-        // Always update deviceId in case board was reassigned
-        Firebase.setString(fbdo, metaPath + "/deviceId", DEVICE_ID);
       }
     }
 

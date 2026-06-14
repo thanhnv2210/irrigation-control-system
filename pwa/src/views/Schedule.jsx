@@ -9,7 +9,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const EMPTY_FORM = { hour: 6, minute: 0, durationMinutes: 10, enabled: true, days: [1,2,3,4,5] }
 
-function ScheduleForm({ zoneId, initial, onDone }) {
+function ScheduleForm({ zoneId, deviceId, initial, onDone }) {
   const { sitePath } = useSite()
   const [form, setForm] = useState(initial ?? EMPTY_FORM)
 
@@ -23,8 +23,8 @@ function ScheduleForm({ zoneId, initial, onDone }) {
   async function save() {
     if (form.days.length === 0) return alert('Select at least one day')
     const isNew    = !initial?._id
-    const baseRef  = ref(db, sitePath(`zones/${zoneId}/schedule`))
-    const entryRef = isNew ? push(baseRef) : ref(db, sitePath(`zones/${zoneId}/schedule/${initial._id}`))
+    const baseRef  = ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/schedule`))
+    const entryRef = isNew ? push(baseRef) : ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/schedule/${initial._id}`))
     const entry = {
       hour:            Number(form.hour),
       minute:          Number(form.minute),
@@ -33,7 +33,7 @@ function ScheduleForm({ zoneId, initial, onDone }) {
       days:            form.days
     }
     await set(entryRef, entry)
-    logAudit(sitePath, 'SCHEDULE_SAVED', zoneId, { ...entry, isNew })
+    logAudit(sitePath, 'SCHEDULE_SAVED', `${deviceId}/${zoneId}`, { ...entry, isNew })
     onDone()
   }
 
@@ -74,18 +74,18 @@ function ScheduleForm({ zoneId, initial, onDone }) {
   )
 }
 
-function ScheduleItem({ zoneId, id, entry, onEdit }) {
+function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
   const { sitePath } = useSite()
   const days = (entry.days ?? []).map(d => DAY_LABELS[d]).join(', ')
   const time = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`
 
   async function toggle() {
-    await set(ref(db, sitePath(`zones/${zoneId}/schedule/${id}/enabled`)), !entry.enabled)
-    logAudit(sitePath, 'SCHEDULE_TOGGLED', zoneId, { scheduleId: id, hour: entry.hour, minute: entry.minute, enabled: !entry.enabled })
+    await set(ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/schedule/${id}/enabled`)), !entry.enabled)
+    logAudit(sitePath, 'SCHEDULE_TOGGLED', `${deviceId}/${zoneId}`, { scheduleId: id, hour: entry.hour, minute: entry.minute, enabled: !entry.enabled })
   }
   async function del() {
-    await remove(ref(db, sitePath(`zones/${zoneId}/schedule/${id}`)))
-    logAudit(sitePath, 'SCHEDULE_DELETED', zoneId, { scheduleId: id, hour: entry.hour, minute: entry.minute })
+    await remove(ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/schedule/${id}`)))
+    logAudit(sitePath, 'SCHEDULE_DELETED', `${deviceId}/${zoneId}`, { scheduleId: id, hour: entry.hour, minute: entry.minute })
   }
 
   return (
@@ -103,8 +103,8 @@ function ScheduleItem({ zoneId, id, entry, onEdit }) {
   )
 }
 
-function ZoneSchedule({ zoneId, label }) {
-  const { schedule } = useZoneData(zoneId)
+function ZoneSchedule({ zoneId, deviceId, label }) {
+  const { schedule } = useZoneData({ zoneId, deviceId })
   const [editing, setEditing] = useState(null)  // null | {} | { _id, ...entry }
 
   return (
@@ -115,7 +115,7 @@ function ZoneSchedule({ zoneId, label }) {
       </div>
 
       {editing !== null && (
-        <ScheduleForm zoneId={zoneId} initial={editing._id ? editing : null} onDone={() => setEditing(null)} />
+        <ScheduleForm zoneId={zoneId} deviceId={deviceId} initial={editing._id ? editing : null} onDone={() => setEditing(null)} />
       )}
 
       {Object.keys(schedule).length === 0 && editing === null && (
@@ -123,7 +123,7 @@ function ZoneSchedule({ zoneId, label }) {
       )}
 
       {Object.entries(schedule).map(([id, entry]) => (
-        <ScheduleItem key={id} zoneId={zoneId} id={id} entry={entry} onEdit={setEditing} />
+        <ScheduleItem key={id} zoneId={zoneId} deviceId={deviceId} id={id} entry={entry} onEdit={setEditing} />
       ))}
     </div>
   )
@@ -138,7 +138,7 @@ export default function Schedule() {
           No zones configured for this site.
         </p>
       )}
-      {zones.map(z => <ZoneSchedule key={z.id} zoneId={z.id} label={z.label} />)}
+      {zones.map(z => <ZoneSchedule key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />)}
     </div>
   )
 }

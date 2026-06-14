@@ -23,26 +23,32 @@ export function SiteProvider({ children }) {
     return unsub
   }, [])
 
-  // Watch zones for current site — derived from meta keys under zones/
-  useEffect(() => {
-    const unsub = onValue(ref(db, `irrigation/sites/${siteId}/zones`), snap => {
-      const val = snap.val()
-      if (!val) { setZones([]); return }
-      const list = Object.entries(val)
-        .filter(([, z]) => z?.meta)
-        .map(([id, z]) => ({ id, label: z.meta?.name || id, deviceId: z.meta?.deviceId || null }))
-      setZones(list)
-    })
-    return unsub
-  }, [siteId])
-
-  // Watch all devices for current site
+  // Watch all devices for current site — derive both devices list and zones list
   useEffect(() => {
     const unsub = onValue(ref(db, `irrigation/sites/${siteId}/devices`), snap => {
       const val = snap.val()
-      if (!val) { setDevices([]); return }
-      const list = Object.entries(val).map(([id, d]) => ({ id, ...d }))
-      setDevices(list)
+      if (!val) { setDevices([]); setZones([]); return }
+
+      const deviceList = Object.entries(val).map(([id, d]) => ({
+        id,
+        name:      d.meta?.name,
+        lastSeen:  d.meta?.lastSeen,
+        ipAddress: d.meta?.ipAddress,
+        wifiRssi:  d.meta?.wifiRssi,
+        firmware:  d.meta?.firmware,
+      }))
+      setDevices(deviceList)
+
+      // Derive zones by iterating each device's zones sub-tree
+      const zoneList = []
+      for (const [deviceId, d] of Object.entries(val)) {
+        if (!d.zones) continue
+        for (const [zoneId, z] of Object.entries(d.zones)) {
+          if (!z?.meta) continue
+          zoneList.push({ id: zoneId, label: z.meta?.name || zoneId, deviceId })
+        }
+      }
+      setZones(zoneList)
     })
     return unsub
   }, [siteId])
@@ -70,12 +76,12 @@ export function SiteProvider({ children }) {
     await set(ref(db, `irrigation/sites/${id}/meta/name`), name)
   }
 
-  async function renameZone(zoneId, name) {
-    await set(ref(db, `irrigation/sites/${siteId}/zones/${zoneId}/meta/name`), name)
+  async function renameZone(zoneId, deviceId, name) {
+    await set(ref(db, `irrigation/sites/${siteId}/devices/${deviceId}/zones/${zoneId}/meta/name`), name)
   }
 
   async function renameDevice(deviceId, name) {
-    await set(ref(db, `irrigation/sites/${siteId}/devices/${deviceId}/name`), name)
+    await set(ref(db, `irrigation/sites/${siteId}/devices/${deviceId}/meta/name`), name)
   }
 
   async function deleteSite(id) {

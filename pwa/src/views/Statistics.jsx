@@ -56,9 +56,9 @@ function buildWateringBands(history, data) {
   return bands
 }
 
-function ZoneChart({ zoneId, label, mode, range, dateStr }) {
-  const recent = useHistory(zoneId, range.points)
-  const byDate = useHistoryByDate(zoneId, mode === 'date' ? dateStr : null)
+function ZoneChart({ zoneId, deviceId, label, mode, range, dateStr }) {
+  const recent = useHistory({ zoneId, deviceId }, range.points)
+  const byDate = useHistoryByDate({ zoneId, deviceId }, mode === 'date' ? dateStr : null)
 
   const { history, loading } = mode === 'date' ? byDate : recent
 
@@ -220,6 +220,7 @@ export default function Statistics() {
         <ZoneChart
           key={z.id}
           zoneId={z.id}
+          deviceId={z.deviceId}
           label={z.label}
           mode={mode}
           range={range}

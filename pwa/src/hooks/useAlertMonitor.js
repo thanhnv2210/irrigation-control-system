@@ -23,7 +23,7 @@ function setLastAlert(key) { localStorage.setItem(`irrigAlert_${key}`, Date.now(
 function clearLastAlert(key) { localStorage.removeItem(`irrigAlert_${key}`) }
 
 function ZoneAlertMonitor({ zone, settings, siteId }) {
-  const { sensor } = useZoneData(zone.id)
+  const { sensor } = useZoneData({ zoneId: zone.id, deviceId: zone.deviceId })
   const moisture = sensor?.moisturePercent
   const prevAbove = useRef(true)
 

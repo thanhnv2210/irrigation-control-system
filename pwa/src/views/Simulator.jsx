@@ -52,40 +52,47 @@ function DeviceSimulator() {
     const { moisture: m, valveOpen: v } = stateRef.current
     const newMoisture = {}
 
+    const seenDevices = new Set()
+
     for (const zone of zonesRef.current) {
+      const { deviceId } = zone
       const pct = nextMoisture(m[zone.id] ?? 62, v[zone.id] ?? false)
       const raw = Math.round(3200 - (pct / 100) * 2000)
       newMoisture[zone.id] = pct
 
       const sensorData = { moisturePercent: pct, rawValue: raw, timestamp: Date.now() }
+      const zoneBase = `devices/${deviceId}/zones/${zone.id}`
 
-      await set(ref(db, sp(`zones/${zone.id}/sensor`)), sensorData)
-      await push(ref(db, sp(`zones/${zone.id}/history`)), sensorData)
+      await set(ref(db, sp(`${zoneBase}/sensor`)), sensorData)
+      await push(ref(db, sp(`${zoneBase}/history`)), sensorData)
 
-      const cmdSnap = await get(ref(db, sp(`zones/${zone.id}/command`)))
+      const cmdSnap = await get(ref(db, sp(`${zoneBase}/command`)))
       const cmd = cmdSnap.val()
 
       if (cmd?.action === 'OPEN') {
-        await set(ref(db, sp(`zones/${zone.id}/valve`)), { state: 'OPEN', openedBy: 'manual', lastChangedAt: Date.now() })
-        await set(ref(db, sp(`zones/${zone.id}/command/action`)), null)
+        await set(ref(db, sp(`${zoneBase}/valve`)), { state: 'OPEN', openedBy: 'manual', lastChangedAt: Date.now() })
+        await set(ref(db, sp(`${zoneBase}/command/action`)), null)
         setValveOpen(prev => ({ ...prev, [zone.id]: true }))
         addLog(`${zone.label}: command OPEN → valve opened, command cleared`)
       } else if (cmd?.action === 'CLOSE') {
-        await set(ref(db, sp(`zones/${zone.id}/valve`)), { state: 'CLOSED', openedBy: 'manual', lastChangedAt: Date.now() })
-        await set(ref(db, sp(`zones/${zone.id}/command/action`)), null)
+        await set(ref(db, sp(`${zoneBase}/valve`)), { state: 'CLOSED', openedBy: 'manual', lastChangedAt: Date.now() })
+        await set(ref(db, sp(`${zoneBase}/command/action`)), null)
         setValveOpen(prev => ({ ...prev, [zone.id]: false }))
         addLog(`${zone.label}: command CLOSE → valve closed, command cleared`)
       }
 
       addLog(`${zone.label}: moisture ${pct}% (raw ${raw})${v[zone.id] ? ' 💧 valve open' : ''}`)
+      seenDevices.add(deviceId)
     }
 
-    await set(ref(db, sp('devices/esp32-01')), {
-      firmware: '1.0.0-sim',
-      ipAddress: '127.0.0.1',
-      wifiRssi: -45,
-      lastSeen: Date.now()
-    })
+    for (const deviceId of seenDevices) {
+      await set(ref(db, sp(`devices/${deviceId}/meta`)), {
+        firmware: '1.0.0-sim',
+        ipAddress: '127.0.0.1',
+        wifiRssi: -45,
+        lastSeen: Date.now()
+      })
+    }
 
     setMoisture(newMoisture)
   }
@@ -156,20 +163,22 @@ function AdHocActions() {
     setLog(l => [`[${ts}] ${msg}`, ...l].slice(0, 20))
   }
 
-  async function setValve(zoneId, label, state) {
-    await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
+  async function setValve(zone, state) {
+    const base = sitePath(`devices/${zone.deviceId}/zones/${zone.id}`)
+    await set(ref(db, `${base}/valve`), {
       state, openedBy: 'manual', lastChangedAt: Date.now()
     })
-    await set(ref(db, sitePath(`zones/${zoneId}/command/action`)), null)
-    addLog(`${label}: valve set to ${state}, command cleared`)
+    await set(ref(db, `${base}/command/action`), null)
+    addLog(`${zone.label}: valve set to ${state}, command cleared`)
   }
 
-  async function publishSensor(zoneId, label, pct) {
+  async function publishSensor(zone, pct) {
     const raw = Math.round(3200 - (pct / 100) * 2000)
     const data = { moisturePercent: pct, rawValue: raw, timestamp: Date.now() }
-    await set(ref(db, sitePath(`zones/${zoneId}/sensor`)), data)
-    await push(ref(db, sitePath(`zones/${zoneId}/history`)), data)
-    addLog(`${label}: published moisture ${pct}%`)
+    const base = sitePath(`devices/${zone.deviceId}/zones/${zone.id}`)
+    await set(ref(db, `${base}/sensor`), data)
+    await push(ref(db, `${base}/history`), data)
+    addLog(`${zone.label}: published moisture ${pct}%`)
   }
 
   return (
@@ -181,10 +190,10 @@ function AdHocActions() {
         <div key={z.id} style={styles.zoneBlock}>
           <span style={styles.zoneName}>{z.label}</span>
           <div style={styles.actionRow}>
-            <button style={{ ...styles.smallBtn, background: '#e05c3a' }} onClick={() => setValve(z.id, z.label, 'OPEN')}>Valve OPEN</button>
-            <button style={{ ...styles.smallBtn, background: '#2e4a38' }} onClick={() => setValve(z.id, z.label, 'CLOSED')}>Valve CLOSE</button>
-            <button style={{ ...styles.smallBtn, background: '#2a3d5a' }} onClick={() => publishSensor(z.id, z.label, 25)}>Dry (25%)</button>
-            <button style={{ ...styles.smallBtn, background: '#1a5a3a' }} onClick={() => publishSensor(z.id, z.label, 75)}>Wet (75%)</button>
+            <button style={{ ...styles.smallBtn, background: '#e05c3a' }} onClick={() => setValve(z, 'OPEN')}>Valve OPEN</button>
+            <button style={{ ...styles.smallBtn, background: '#2e4a38' }} onClick={() => setValve(z, 'CLOSED')}>Valve CLOSE</button>
+            <button style={{ ...styles.smallBtn, background: '#2a3d5a' }} onClick={() => publishSensor(z, 25)}>Dry (25%)</button>
+            <button style={{ ...styles.smallBtn, background: '#1a5a3a' }} onClick={() => publishSensor(z, 75)}>Wet (75%)</button>
           </div>
         </div>
       ))}
@@ -210,21 +219,22 @@ function ScheduleTrigger() {
     setLog(l => [`[${ts}] ${msg}`, ...l].slice(0, 20))
   }
 
-  function ZoneTrigger({ zoneId, label }) {
-    const { schedule, valve } = useZoneData(zoneId)
+  function ZoneTrigger({ zoneId, deviceId, label }) {
+    const { schedule, valve } = useZoneData({ zoneId, deviceId })
     const { sitePath } = useSite()
     const entries = Object.entries(schedule || {})
 
     async function fire(scheduleId, entry) {
       const durationMs = entry.durationMinutes * 60 * 1000
-      await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
+      const valvePath = sitePath(`devices/${deviceId}/zones/${zoneId}/valve`)
+      await set(ref(db, valvePath), {
         state: 'OPEN', openedBy: 'schedule', lastChangedAt: Date.now()
       })
-      logAudit(sitePath, 'SCHEDULE_FIRED', zoneId, { scheduleId, hour: entry.hour, minute: entry.minute, durationMinutes: entry.durationMinutes })
+      logAudit(sitePath, 'SCHEDULE_FIRED', `${deviceId}/${zoneId}`, { scheduleId, hour: entry.hour, minute: entry.minute, durationMinutes: entry.durationMinutes })
       addLog(`${label}: schedule fired "${entry.hour}:${String(entry.minute).padStart(2,'0')}" — valve OPEN for ${entry.durationMinutes} min`)
 
       setTimeout(async () => {
-        await set(ref(db, sitePath(`zones/${zoneId}/valve`)), {
+        await set(ref(db, valvePath), {
           state: 'CLOSED', openedBy: 'schedule', lastChangedAt: Date.now()
         })
         addLog(`${label}: schedule duration elapsed — valve CLOSED`)
@@ -266,7 +276,7 @@ function ScheduleTrigger() {
       <span style={styles.cardTitle}>Schedule Trigger</span>
       <p style={styles.hint}>Fire a schedule immediately without waiting for the clock. Valve closes after the configured duration.</p>
 
-      {zones.map(z => <ZoneTrigger key={z.id} zoneId={z.id} label={z.label} />)}
+      {zones.map(z => <ZoneTrigger key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />)}
 
       {log.length > 0 && (
         <div style={styles.log}>
@@ -328,7 +338,7 @@ function DataSeeder() {
         const key   = `-seed${ts.toString(36)}${(seqN++).toString(36)}`
         const entry = { moisturePercent: pct, rawValue: raw, timestamp: ts, valveOpen: isWatering }
 
-        updates[sitePath(`zones/${zone.id}/history/${key}`)] = entry
+        updates[sitePath(`devices/${zone.deviceId}/zones/${zone.id}/history/${key}`)] = entry
       }
     }
 
@@ -377,16 +387,20 @@ function DataSeeder() {
 // Main view
 // ---------------------------------------------------------------------------
 function DeviceOnlineWarning() {
-  const { sitePath } = useSite()
+  const { sitePath, devices } = useSite()
   const [online, setOnline] = useState(false)
 
   useEffect(() => {
-    const unsub = onValue(ref(db, sitePath('devices/esp32-01/lastSeen')), snap => {
-      const lastSeen = snap.val()
-      setOnline(lastSeen && (Date.now() - lastSeen) < 90000)
-    })
-    return unsub
-  }, [sitePath])
+    if (devices.length === 0) return
+    // Watch all known devices' meta for a recent lastSeen
+    const unsubs = devices.map(d =>
+      onValue(ref(db, sitePath(`devices/${d.id}/meta/lastSeen`)), snap => {
+        const lastSeen = snap.val()
+        if (lastSeen && (Date.now() - lastSeen) < 90000) setOnline(true)
+      })
+    )
+    return () => unsubs.forEach(u => u())
+  }, [sitePath, devices])
 
   if (!online) return null
 
