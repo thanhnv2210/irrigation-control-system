@@ -5,6 +5,7 @@ import { useZoneData } from '../hooks/useZoneData'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
+import { useAuth } from '../App'
 
 const MIN_SECONDS     = 30       // 30 seconds minimum
 const MAX_SECONDS     = 9 * 60  // 9 minutes maximum
@@ -22,6 +23,7 @@ function formatDuration(totalSeconds) {
 function ZoneControl({ zoneId, deviceId, label }) {
   const { valve, command } = useZoneData({ zoneId, deviceId })
   const { sitePath } = useSite()
+  const { isGuest } = useAuth()
   const [pending,        setPending]        = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(DEFAULT_SECONDS)
 
@@ -61,39 +63,45 @@ function ZoneControl({ zoneId, deviceId, label }) {
         </div>
       )}
 
-      <div style={styles.durationRow}>
-        <span style={styles.durationLabel}>Duration</span>
-        <div style={styles.durationControls}>
-          <button
-            style={styles.durationBtn}
-            disabled={durationSeconds <= MIN_SECONDS}
-            onClick={() => setDurationSeconds(d => Math.max(MIN_SECONDS, d - STEP_SECONDS))}
-          >−</button>
-          <span style={styles.durationValue}>{formatDuration(durationSeconds)}</span>
-          <button
-            style={styles.durationBtn}
-            disabled={durationSeconds >= MAX_SECONDS}
-            onClick={() => setDurationSeconds(d => Math.min(MAX_SECONDS, d + STEP_SECONDS))}
-          >+</button>
-        </div>
-      </div>
+      {isGuest ? (
+        <p style={styles.guestNotice}>Sign in to control valves</p>
+      ) : (
+        <>
+          <div style={styles.durationRow}>
+            <span style={styles.durationLabel}>Duration</span>
+            <div style={styles.durationControls}>
+              <button
+                style={styles.durationBtn}
+                disabled={durationSeconds <= MIN_SECONDS}
+                onClick={() => setDurationSeconds(d => Math.max(MIN_SECONDS, d - STEP_SECONDS))}
+              >−</button>
+              <span style={styles.durationValue}>{formatDuration(durationSeconds)}</span>
+              <button
+                style={styles.durationBtn}
+                disabled={durationSeconds >= MAX_SECONDS}
+                onClick={() => setDurationSeconds(d => Math.min(MAX_SECONDS, d + STEP_SECONDS))}
+              >+</button>
+            </div>
+          </div>
 
-      <div style={styles.btnRow}>
-        <button
-          style={{ ...styles.btn, ...styles.btnOpen }}
-          disabled={isOpen || hasPending}
-          onClick={() => handlePress('OPEN')}
-        >
-          Open Valve
-        </button>
-        <button
-          style={{ ...styles.btn, ...styles.btnClose }}
-          disabled={!isOpen || hasPending}
-          onClick={() => handlePress('CLOSE')}
-        >
-          Close Valve
-        </button>
-      </div>
+          <div style={styles.btnRow}>
+            <button
+              style={{ ...styles.btn, ...styles.btnOpen }}
+              disabled={isOpen || hasPending}
+              onClick={() => handlePress('OPEN')}
+            >
+              Open Valve
+            </button>
+            <button
+              style={{ ...styles.btn, ...styles.btnClose }}
+              disabled={!isOpen || hasPending}
+              onClick={() => handlePress('CLOSE')}
+            >
+              Close Valve
+            </button>
+          </div>
+        </>
+      )}
 
       {pending && (
         <ConfirmDialog
@@ -140,5 +148,6 @@ const styles = {
   btn:           { flex: 1, padding: '1rem', borderRadius: '12px', border: 'none', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' },
   btnOpen:       { background: '#e05c3a', color: '#fff' },
   btnClose:      { background: '#2e4a38', color: '#a0c8b0' },
-  empty:         { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }
+  empty:         { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' },
+  guestNotice:   { color: '#4a7a5a', fontSize: '0.85rem', fontStyle: 'italic', margin: '0.5rem 0 0' }
 }

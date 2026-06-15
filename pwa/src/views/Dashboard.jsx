@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useZoneData, useDeviceData } from '../hooks/useZoneData'
 import { useSite } from '../context/SiteContext'
+import { useAuth } from '../App'
 
 function MoistureGauge({ percent }) {
   const clamped = Math.max(0, Math.min(100, percent ?? 0))
@@ -18,6 +19,7 @@ function MoistureGauge({ percent }) {
 function ZoneCard({ zoneId, deviceId, label }) {
   const { sensor, valve } = useZoneData({ zoneId, deviceId })
   const { renameZone } = useSite()
+  const { isGuest } = useAuth()
   const [renaming,  setRenaming]  = useState(false)
   const [editName,  setEditName]  = useState('')
 
@@ -56,7 +58,7 @@ function ZoneCard({ zoneId, deviceId, label }) {
         ) : (
           <div style={styles.nameRow}>
             <span style={styles.zoneName}>{label}</span>
-            <button style={styles.iconBtn} onClick={startRename} title="Rename zone">✎</button>
+            {!isGuest && <button style={styles.iconBtn} onClick={startRename} title="Rename zone">✎</button>}
           </div>
         )}
         <span style={{ ...styles.valveBadge, background: isOpen ? '#e05c3a' : '#1a7f4b' }}>
@@ -76,6 +78,7 @@ function ZoneCard({ zoneId, deviceId, label }) {
 function DeviceStatus({ deviceId }) {
   const device = useDeviceData(deviceId)
   const { renameDevice } = useSite()
+  const { isGuest } = useAuth()
   const [renaming, setRenaming] = useState(false)
   const [editName, setEditName] = useState('')
 
@@ -127,7 +130,7 @@ function DeviceStatus({ deviceId }) {
             {' '}{online ? 'online' : 'offline'} — {device.ipAddress} — RSSI {device.wifiRssi} dBm — last seen {lastSeen}
             {diagText && <><br /><span style={{ color: '#e0b03a' }}>{diagText}</span></>}
           </span>
-          <button style={styles.iconBtn} onClick={startRename} title="Rename device">✎</button>
+          {!isGuest && <button style={styles.iconBtn} onClick={startRename} title="Rename device">✎</button>}
         </>
       )}
     </div>

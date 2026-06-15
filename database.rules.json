@@ -6,6 +6,8 @@
     //   BUqnab10ASdHkwAM3HOezLIq6qe2  — owner-irrigation@app.local (test account)
     // Device UID
     //   2GVAabgRrafbeBkfpeagzYnnU9w2  — esp32-irrigation@device.local
+    // Guest access
+    //   auth.token.firebase.sign_in_provider === 'anonymous'  — read-only, no write
     // -----------------------------------------------------------------------
 
     // -----------------------------------------------------------------------
@@ -22,26 +24,26 @@
     // -----------------------------------------------------------------------
     "irrigation": {
       "sites": {
-        ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+        ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
         "$site_id": {
-          ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+          ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
           ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
           // Site metadata
           "meta": {
-            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
           // Devices — each device owns its meta heartbeat and zones
           "devices": {
             "$device_id": {
-              ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+              ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
               ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
               // Device heartbeat — ESP32 or owner writes
               "meta": {
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                 ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
               },
 
@@ -50,23 +52,23 @@
                 "$zone_id": {
 
                   "meta": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
                   },
 
                   "sensor": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
                   "history": {
                     ".indexOn": ["timestamp"],
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
                   "valve": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
@@ -76,7 +78,7 @@
                   },
 
                   "schedule": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')",
+                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   }
                 }
@@ -87,13 +89,13 @@
           // Audit log — per site
           "auditLog": {
             ".indexOn": ["timestamp"],
-            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
           // Settings (alerts, Telegram) — per site
           "settings": {
-            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           }
         }

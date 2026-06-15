@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { auth } from '../firebase'
 import { useSite } from '../context/SiteContext'
+import { useAuth } from '../App'
 
 // ── User Profile ─────────────────────────────────────────────────────────────
 function UserProfile() {
@@ -165,10 +166,11 @@ function SiteManagement() {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function Settings() {
+  const { isGuest } = useAuth()
   return (
     <div style={styles.page}>
       <UserProfile />
-      <SiteManagement />
+      {!isGuest && <SiteManagement />}
     </div>
   )
 }

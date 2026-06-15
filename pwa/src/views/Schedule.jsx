@@ -4,6 +4,7 @@ import { db } from '../firebase'
 import { useZoneData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
+import { useAuth } from '../App'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -76,6 +77,7 @@ function ScheduleForm({ zoneId, deviceId, initial, onDone }) {
 
 function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
   const { sitePath } = useSite()
+  const { isGuest } = useAuth()
   const days = (entry.days ?? []).map(d => DAY_LABELS[d]).join(', ')
   const time = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`
 
@@ -94,24 +96,27 @@ function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
         <span style={styles.itemTime}>{time}</span>
         <span style={styles.itemMeta}>{entry.durationMinutes} min — {days}</span>
       </div>
-      <div style={styles.itemActions}>
-        <button style={styles.iconBtn} onClick={toggle}>{entry.enabled ? 'Disable' : 'Enable'}</button>
-        <button style={styles.iconBtn} onClick={() => onEdit({ ...entry, _id: id })}>Edit</button>
-        <button style={{ ...styles.iconBtn, color: '#e05c3a' }} onClick={del}>Delete</button>
-      </div>
+      {!isGuest && (
+        <div style={styles.itemActions}>
+          <button style={styles.iconBtn} onClick={toggle}>{entry.enabled ? 'Disable' : 'Enable'}</button>
+          <button style={styles.iconBtn} onClick={() => onEdit({ ...entry, _id: id })}>Edit</button>
+          <button style={{ ...styles.iconBtn, color: '#e05c3a' }} onClick={del}>Delete</button>
+        </div>
+      )}
     </div>
   )
 }
 
 function ZoneSchedule({ zoneId, deviceId, label }) {
   const { schedule } = useZoneData({ zoneId, deviceId })
+  const { isGuest } = useAuth()
   const [editing, setEditing] = useState(null)  // null | {} | { _id, ...entry }
 
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
         <span style={styles.zoneName}>{label}</span>
-        <button style={styles.addBtn} onClick={() => setEditing({})}>+ Add</button>
+        {!isGuest && <button style={styles.addBtn} onClick={() => setEditing({})}>+ Add</button>}
       </div>
 
       {editing !== null && (
@@ -119,7 +124,7 @@ function ZoneSchedule({ zoneId, deviceId, label }) {
       )}
 
       {Object.keys(schedule).length === 0 && editing === null && (
-        <p style={styles.empty}>No schedules — tap + Add to create one.</p>
+        <p style={styles.empty}>No schedules{isGuest ? '.' : ' — tap + Add to create one.'}</p>
       )}
 
       {Object.entries(schedule).map(([id, entry]) => (

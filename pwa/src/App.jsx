@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { auth, signIn, signOut, onAuthStateChanged } from './firebase'
+import { useState, useEffect, createContext, useContext } from 'react'
+import { auth, signIn, signInAsGuest, signOut, onAuthStateChanged } from './firebase'
 import Dashboard  from './views/Dashboard'
 import Control    from './views/Control'
 import Schedule   from './views/Schedule'
@@ -11,6 +11,9 @@ import MapView    from './views/MapView'
 import Settings   from './views/Settings'
 import { useAlertMonitor } from './hooks/useAlertMonitor'
 import { SiteProvider, useSite } from './context/SiteContext'
+
+export const AuthContext = createContext({ isGuest: false })
+export const useAuth = () => useContext(AuthContext)
 
 // Bottom nav — daily-use views
 const NAV_TABS = [
@@ -29,7 +32,7 @@ const MENU_ITEMS = [
   { id: 'settings',  label: 'Settings',    icon: '⚙️' },
 ]
 
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, onGuest }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
@@ -43,6 +46,18 @@ function LoginScreen({ onLogin }) {
       await onLogin(email, password)
     } catch {
       setError('Invalid email or password')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGuest() {
+    setError('')
+    setLoading(true)
+    try {
+      await onGuest()
+    } catch {
+      setError('Guest sign-in failed')
     } finally {
       setLoading(false)
     }
@@ -62,6 +77,15 @@ function LoginScreen({ onLogin }) {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+        <div style={styles.guestDivider}>
+          <span style={styles.guestDividerLine} />
+          <span style={styles.guestDividerText}>or</span>
+          <span style={styles.guestDividerLine} />
+        </div>
+        <button style={styles.guestBtn} onClick={handleGuest} disabled={loading}>
+          Continue as Guest
+        </button>
+        <p style={styles.guestNote}>View-only — no controls</p>
       </div>
     </div>
   )
@@ -94,8 +118,10 @@ function SiteSwitcher() {
   )
 }
 
-function Drawer({ open, onClose, tab, setTab, user }) {
-  const allItems = [...MENU_ITEMS]
+function Drawer({ open, onClose, tab, setTab, user, isGuest }) {
+  const allItems = isGuest
+    ? MENU_ITEMS.filter(m => m.id !== 'simulator')
+    : [...MENU_ITEMS]
 
   async function handleSignOut() {
     if (!confirm('Sign out?')) return
@@ -119,11 +145,11 @@ function Drawer({ open, onClose, tab, setTab, user }) {
         {/* User section */}
         <div style={styles.drawerUser}>
           <div style={styles.drawerAvatar}>
-            {(user?.displayName || user?.email || '?')[0].toUpperCase()}
+            {user?.isAnonymous ? 'G' : (user?.displayName || user?.email || '?')[0].toUpperCase()}
           </div>
           <div style={styles.drawerUserInfo}>
-            <span style={styles.drawerUserName}>{user?.displayName || 'User'}</span>
-            <span style={styles.drawerUserEmail}>{user?.email}</span>
+            <span style={styles.drawerUserName}>{user?.isAnonymous ? 'Guest' : (user?.displayName || 'User')}</span>
+            <span style={styles.drawerUserEmail}>{user?.isAnonymous ? 'View-only access' : user?.email}</span>
           </div>
         </div>
 
@@ -172,12 +198,14 @@ function AppShell() {
   }, [])
 
   if (user === undefined) return <div style={styles.loading}>Loading...</div>
-  if (!user)              return <LoginScreen onLogin={signIn} />
+  if (!user)              return <LoginScreen onLogin={signIn} onGuest={signInAsGuest} />
 
+  const isGuest = user.isAnonymous
   const isMenuTab = MENU_ITEMS.some(m => m.id === tab)
   const activeMenuLabel = isMenuTab ? MENU_ITEMS.find(m => m.id === tab)?.label : null
 
   return (
+    <AuthContext.Provider value={{ isGuest }}>
     <div style={styles.app}>
       <header style={styles.header}>
         <button style={styles.menuBtn} onClick={() => setDrawerOpen(true)} aria-label="Menu">
@@ -199,6 +227,7 @@ function AppShell() {
         tab={tab}
         setTab={setTab}
         user={user}
+        isGuest={isGuest}
       />
 
       <main style={styles.main}>
@@ -226,6 +255,7 @@ function AppShell() {
         ))}
       </nav>
     </div>
+    </AuthContext.Provider>
   )
 }
 
@@ -285,4 +315,9 @@ const styles = {
   input:          { background: '#0f1f15', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.75rem 1rem', color: '#e0f0e8', fontSize: '1rem', outline: 'none' },
   error:          { color: '#e05c3a', fontSize: '0.85rem', margin: 0, textAlign: 'center' },
   loginBtn:       { background: '#1a7f4b', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.8rem', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', marginTop: '0.25rem' },
+  guestDivider:   { display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '1rem 0 0.75rem' },
+  guestDividerLine: { flex: 1, height: '1px', background: '#3a5a45' },
+  guestDividerText: { color: '#7aab90', fontSize: '0.8rem', flexShrink: 0 },
+  guestBtn:       { background: 'transparent', color: '#7aab90', border: '1px solid #3a5a45', borderRadius: '8px', padding: '0.7rem', fontSize: '0.95rem', cursor: 'pointer', width: '100%' },
+  guestNote:      { color: '#4a7a5a', fontSize: '0.75rem', textAlign: 'center', margin: '0.5rem 0 0' },
 }

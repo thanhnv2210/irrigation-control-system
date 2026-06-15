@@ -3,6 +3,7 @@ import { ref, onValue, set } from 'firebase/database'
 import { db } from '../firebase'
 import { useDeviceData } from '../hooks/useZoneData'
 import { useSite } from '../context/SiteContext'
+import { useAuth } from '../App'
 
 function getLastAlert(zoneId) {
   const v = localStorage.getItem(`irrigAlert_${zoneId}`)
@@ -37,6 +38,7 @@ export default function Alerts() {
   const [testStatus,     setTestStatus]     = useState('')
 
   const { sitePath, zones, devices } = useSite()
+  const { isGuest } = useAuth()
   const device = useDeviceData(devices[0]?.id ?? 'esp32-01')
   const offlineThresholdMs = offlineMinutes * 60 * 1000
   const isOnline  = device?.lastSeen && Date.now() - device.lastSeen < offlineThresholdMs
@@ -139,9 +141,9 @@ export default function Alerts() {
         />
 
         <div style={styles.btnRow}>
-          <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
+          {!isGuest && <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </button>}
           <button
             style={{ ...styles.btn, background: testStatus === 'ok' ? '#1a7f4b' : testStatus === 'fail' ? '#e05c3a' : '#2a3d5a' }}
             onClick={sendTest}
@@ -191,9 +193,9 @@ export default function Alerts() {
           <span style={styles.thresholdVal}>{offlineMinutes} min</span>
         </div>
 
-        <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
+        {!isGuest && <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </button>}
       </div>
 
       {/* Thresholds */}
@@ -236,9 +238,9 @@ export default function Alerts() {
           </div>
         ))}
 
-        <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
+        {!isGuest && <button style={{ ...styles.btn, background: '#1a7f4b' }} onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save Thresholds'}
-        </button>
+        </button>}
       </div>
 
       {/* How it works */}
