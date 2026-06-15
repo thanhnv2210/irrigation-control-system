@@ -43,6 +43,7 @@ How to use the Postman collection to simulate ESP32 behavior against Firebase wh
 | Sensor verification steps | [sensor-verification.md](sensor-verification.md) |
 | Relay control debugging | [relay-control-debugging-2026-06-14.md](relay-control-debugging-2026-06-14.md) |
 | Valve control debugging | [valve-control-debugging-2026-06-15.md](valve-control-debugging-2026-06-15.md) |
+| Guest access / view-only mode | [guest-access.md](guest-access.md) |
 | Portfolio / project overview | [portfolio.md](portfolio.md) |
 
 ---
