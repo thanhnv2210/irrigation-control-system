@@ -88,6 +88,11 @@ function DeviceStatus({ deviceId }) {
   const age    = device.lastSeen ? Math.floor((Date.now() - device.lastSeen) / 1000) : null
   const online = age !== null && age < 90
 
+  const diag = device.lastDiagnostic
+  const diagText = diag
+    ? `Last disconnect: ${diag.reason?.replace('_', ' ')} — offline ${diag.offlineSec}s — RSSI ${diag.wifiRssi} dBm — heap ${diag.freeHeap} — ${diag.timestamp ? new Date(diag.timestamp).toLocaleString() : ''}`
+    : null
+
   function startRename() {
     setEditName(displayName)
     setRenaming(true)
@@ -120,6 +125,7 @@ function DeviceStatus({ deviceId }) {
           <span style={styles.deviceText}>
             <strong style={{ color: online ? '#1a7f4b' : '#e05c3a' }}>{displayName}</strong>
             {' '}{online ? 'online' : 'offline'} — {device.ipAddress} — RSSI {device.wifiRssi} dBm — last seen {lastSeen}
+            {diagText && <><br /><span style={{ color: '#e0b03a' }}>{diagText}</span></>}
           </span>
           <button style={styles.iconBtn} onClick={startRename} title="Rename device">✎</button>
         </>

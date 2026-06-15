@@ -119,6 +119,7 @@ Zone zones[2] = {
 static uint32_t lastSensorMs    = 0;
 static uint32_t lastHeartbeatMs = 0;
 static uint32_t lastFirebaseOkMs = 0;  // tracks last successful Firebase call
+static uint32_t offlineStartMs   = 0;  // millis() when connectivity was lost
 
 // ---------------------------------------------------------------------------
 // Path helper — all data lives under irrigation/sites/{SITE_ID}/
@@ -442,6 +443,7 @@ void streamCallbackZ2(StreamData data) {
 
 void streamTimeoutCallback(bool timeout) {
   if (timeout) {
+    if (offlineStartMs == 0) offlineStartMs = millis();
     Serial.println("[Firebase] Stream timeout — will reconnect");
   }
 }
@@ -452,7 +454,9 @@ void streamTimeoutCallback(bool timeout) {
 void checkFirebaseWatchdog() {
   if (millis() - lastFirebaseOkMs > FIREBASE_TIMEOUT_MS) {
     Serial.println("[Watchdog] Firebase unreachable too long — rebooting");
-    delay(500);
+    offlineStartMs = lastFirebaseOkMs;  // offline since last successful Firebase call
+    publishDiagnostic("watchdog_reboot");
+    delay(1000);
     ESP.restart();
   }
 }
@@ -674,6 +678,33 @@ void setup() {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Diagnostic snapshot — written to Firebase when connectivity is restored
+// Tells you what happened during an offline period without Serial Monitor
+// ---------------------------------------------------------------------------
+void publishDiagnostic(const char* reason) {
+  uint32_t offlineDurationMs = (offlineStartMs > 0) ? (millis() - offlineStartMs) : 0;
+  int offlineSec = offlineDurationMs / 1000;
+
+  FirebaseJson diag;
+  diag.set("reason",         reason);
+  diag.set("offlineSec",     offlineSec);
+  diag.set("uptimeSec",      (int)(millis() / 1000));
+  diag.set("wifiRssi",       WiFi.RSSI());
+  diag.set("ipAddress",      WiFi.localIP().toString());
+  diag.set("freeHeap",       (int)ESP.getFreeHeap());
+  diag.set("timestamp/.sv",  "timestamp");
+
+  String path = String(devicePath()) + "/lastDiagnostic";
+  if (Firebase.updateNode(fbdo, path, diag)) {
+    Serial.printf("[Diag] Snapshot written — reason: %s | offline: %ds | heap: %d\n",
+      reason, offlineSec, ESP.getFreeHeap());
+  } else {
+    Serial.printf("[Diag] Snapshot write failed: %s\n", fbdo.errorReason().c_str());
+  }
+  offlineStartMs = 0;  // reset
+}
+
 // WiFi reconnect — monitors connection and reconnects if lost
 // ---------------------------------------------------------------------------
 static uint32_t lastWifiCheckMs   = 0;
@@ -684,6 +715,7 @@ void checkWifi() {
 
   if (!connected) {
     if (wifiWasConnected) {
+      offlineStartMs = millis();  // start tracking offline duration
       Serial.println("[WiFi] Connection lost — attempting reconnect...");
     }
     WiFi.disconnect();
@@ -700,6 +732,7 @@ void checkWifi() {
       Serial.printf("[WiFi] Reconnected, IP: %s | RSSI: %d dBm\n",
         WiFi.localIP().toString().c_str(), WiFi.RSSI());
       wifiWasConnected = true;
+      publishDiagnostic("wifi_reconnected");
     } else {
       Serial.printf("[WiFi] Reconnect failed (status %d) — will retry\n", WiFi.status());
       wifiWasConnected = false;
@@ -708,6 +741,7 @@ void checkWifi() {
     if (!wifiWasConnected) {
       Serial.printf("[WiFi] Connected, IP: %s | RSSI: %d dBm\n",
         WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      publishDiagnostic("wifi_reconnected");
     }
     wifiWasConnected = true;
   }

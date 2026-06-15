@@ -183,7 +183,7 @@ export default function Alerts() {
           <span style={styles.lbl}>Alert after</span>
           <input
             type="range"
-            min={2} max={30} step={1}
+            min={5} max={30} step={1}
             value={offlineMinutes}
             onChange={e => setOfflineMinutes(e.target.value)}
             style={{ flex: 1, accentColor: '#1a7f4b' }}

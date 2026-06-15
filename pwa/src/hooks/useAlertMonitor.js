@@ -60,10 +60,12 @@ export function useAlertMonitor() {
 
   const settingsRef     = useRef(null)
   const lastSeenRef     = useRef(null)
+  const diagRef         = useRef(null)
   const deviceWasOnline = useRef(null)
 
   useEffect(() => { settingsRef.current = settings }, [settings])
   useEffect(() => { lastSeenRef.current = device?.lastSeen }, [device?.lastSeen])
+  useEffect(() => { diagRef.current = device?.lastDiagnostic }, [device?.lastDiagnostic])
 
   useEffect(() => {
     const unsub = onValue(ref(db, sitePath('settings/alerts')), snap => {
@@ -78,6 +80,9 @@ export function useAlertMonitor() {
   }, [siteId])
 
   useEffect(() => {
+    // Require 2 consecutive offline checks before alerting — prevents SSL blip false alarms
+    let offlineStreak = 0
+
     function checkDevice() {
       const cfg      = settingsRef.current
       const lastSeen = lastSeenRef.current
@@ -86,8 +91,21 @@ export function useAlertMonitor() {
       const thresholdMs = (cfg.offlineMinutes ?? 5) * 60 * 1000
       const isOnline    = Date.now() - lastSeen < thresholdMs
       const wasOnline   = deviceWasOnline.current
-      if (wasOnline === null) { deviceWasOnline.current = isOnline; return }
-      if (!isOnline && wasOnline) {
+
+      if (wasOnline === null) {
+        deviceWasOnline.current = isOnline
+        offlineStreak = isOnline ? 0 : 1
+        return
+      }
+
+      if (!isOnline) {
+        offlineStreak++
+      } else {
+        offlineStreak = 0
+      }
+
+      // Only alert offline after 2 consecutive misses (reduces SSL blip false alarms)
+      if (!isOnline && wasOnline && offlineStreak >= 2) {
         if (Date.now() - getLastAlert(`${siteId}_device`) > COOLDOWN_MS) {
           const mins = Math.round((Date.now() - lastSeen) / 60000)
           sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
@@ -95,8 +113,16 @@ export function useAlertMonitor() {
           setLastAlert(`${siteId}_device`)
         }
       } else if (isOnline && wasOnline === false) {
-        sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
-          `🟢 <b>Device Back Online</b>\n\n<b>${deviceName}</b> reconnected successfully.\nTime: ${new Date().toLocaleString()}`)
+        // Cooldown on recovery too — prevents online/offline spam pairs
+        if (Date.now() - getLastAlert(`${siteId}_device_online`) > COOLDOWN_MS) {
+          const diag = diagRef.current
+          const diagLine = diag
+            ? `\n\n📋 <b>Disconnect reason:</b> ${diag.reason?.replace('_', ' ')}\n⏱ Offline: ${diag.offlineSec}s\n📶 RSSI: ${diag.wifiRssi} dBm\n🧠 Free heap: ${diag.freeHeap} bytes`
+            : ''
+          sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
+            `🟢 <b>Device Back Online</b>\n\n<b>${deviceName}</b> reconnected successfully.\nTime: ${new Date().toLocaleString()}${diagLine}`)
+          setLastAlert(`${siteId}_device_online`)
+        }
         clearLastAlert(`${siteId}_device`)
       }
       deviceWasOnline.current = isOnline
