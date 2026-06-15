@@ -1,6 +1,6 @@
 # Irrigation Control System — Docs
 
-Step-by-step guides for setting up and running the system.
+A smart irrigation system for balcony and garden zones — ESP32 firmware, Firebase RTDB, and a React PWA deployed at **[irrigation.thanhnguyen.dev](https://irrigation.thanhnguyen.dev/)**.
 
 ---
 
@@ -21,7 +21,7 @@ Install Arduino IDE 2.x, add ESP32 board support, install FirebaseESP32 library,
 Windows-specific guide for flashing the ESP32 — USB driver installation and COM port setup.
 
 ### 5. [Postman Device Simulator](postman-simulator.md)
-How to use the Postman collection to simulate ESP32 behavior against Firebase while waiting for hardware. Covers all test scenarios — boot sequence, manual valve control, schedule trigger, dry soil alert.
+How to use the Postman collection to simulate ESP32 behavior against Firebase while waiting for hardware.
 
 ---
 
@@ -39,7 +39,11 @@ How to use the Postman collection to simulate ESP32 behavior against Firebase wh
 | First boot WiFi setup | [arduino-ide-setup.md](arduino-ide-setup.md#10-first-boot--wifi-provisioning) |
 | Flashing from Windows | [flashing-windows.md](flashing-windows.md) |
 | Simulating device with Postman | [postman-simulator.md](postman-simulator.md) |
-| Test scenarios (valve, schedule, dry soil) | [postman-simulator.md](postman-simulator.md#common-test-scenarios) |
+| First device setup log | [first-device-setup-2026-06-13.md](first-device-setup-2026-06-13.md) |
+| Sensor verification steps | [sensor-verification.md](sensor-verification.md) |
+| Relay control debugging | [relay-control-debugging-2026-06-14.md](relay-control-debugging-2026-06-14.md) |
+| Valve control debugging | [valve-control-debugging-2026-06-15.md](valve-control-debugging-2026-06-15.md) |
+| Portfolio / project overview | [portfolio.md](portfolio.md) |
 
 ---
 
@@ -49,13 +53,13 @@ How to use the Postman collection to simulate ESP32 behavior against Firebase wh
 irrigation-control-system/
 ├── firmware/
 │   ├── irrigation_main/
-│   │   ├── irrigation_main.ino   — production firmware (M1 + M2 complete)
-│   │   ├── config.h              — credentials + SITE_ID (gitignored, never commit)
+│   │   ├── irrigation_main.ino   — production firmware v1.0.1
+│   │   ├── config.h              — credentials + device IDs (gitignored)
 │   │   └── config.h.example      — template with placeholder values
 │   ├── esp_32_auto_config_v1/    — WiFi provisioning sketch (reference)
 │   ├── elb_peripheral_v1/        — TCP + Firebase prototype (reference)
 │   └── Firebase_Sample_2/        — FirebaseESP32 library sample (reference)
-├── pwa/
+├── pwa/                          — React PWA (deployed to irrigation.thanhnguyen.dev)
 │   ├── src/
 │   │   ├── firebase.js           — Firebase init
 │   │   ├── context/SiteContext.jsx — multi-site state + path helper
@@ -64,8 +68,8 @@ irrigation-control-system/
 │   │   │   ├── useHistory.js     — sensor history for Statistics
 │   │   │   └── useAlertMonitor.js — Telegram alert trigger
 │   │   ├── views/
-│   │   │   ├── Dashboard.jsx     — moisture gauges + device status
-│   │   │   ├── Control.jsx       — manual valve open/close
+│   │   │   ├── Dashboard.jsx     — moisture gauges + device status + diagnostic
+│   │   │   ├── Control.jsx       — manual valve open/close with duration picker
 │   │   │   ├── Schedule.jsx      — schedule editor per zone
 │   │   │   ├── Statistics.jsx    — moisture history chart
 │   │   │   ├── MapView.jsx       — drag-and-drop zone pins on garden SVG
@@ -79,16 +83,20 @@ irrigation-control-system/
 │   ├── package.json
 │   └── vite.config.js
 ├── docs/
-│   ├── README.md                  — this file
+│   ├── README.md                         — this file
+│   ├── portfolio.md                      — comprehensive project overview
 │   ├── hardware-guide.md
 │   ├── firebase-setup.md
 │   ├── arduino-ide-setup.md
 │   ├── flashing-windows.md
 │   ├── postman-simulator.md
-│   └── device-onboarding-flow.puml — PlantUML sequence diagram
+│   ├── sensor-verification.md
+│   ├── first-device-setup-2026-06-13.md
+│   ├── relay-control-debugging-2026-06-14.md
+│   ├── valve-control-debugging-2026-06-15.md
+│   └── device-onboarding-flow.puml
 ├── database.rules.json       — Firebase RTDB security rules
 ├── firebase.json             — Firebase CLI deploy config
-├── TODO.md                   — milestone progress tracker
 ├── CLAUDE.md                 — project brief for Claude Code
 └── .gitignore
 ```
@@ -99,10 +107,33 @@ irrigation-control-system/
 
 | Milestone | Status |
 |---|---|
-| M1 — Firmware: Core Loop | Complete — pending hardware for physical verification |
-| M2 — Firmware: Schedules + Multi-zone | Complete — pending hardware for physical verification |
-| M3 — React PWA: Dashboard + Manual Control | Complete — pending hardware for live data |
-| M4 — React PWA: Schedule Editor | Complete — pending hardware for live data |
-| M5 — Hardening | Security rules deployed — alerts and seasonal review pending |
+| M1 — Firmware: Core Loop | ✅ Complete — running in production on esp32-01 |
+| M2 — Firmware: Schedules + Multi-zone | ✅ Complete — schedule execution verified |
+| M3 — React PWA: Dashboard + Manual Control | ✅ Complete — deployed, valve control working |
+| M4 — React PWA: Schedule Editor | ✅ Complete — deployed |
+| M5 — Hardening | 🔄 In progress — security rules deployed, Telegram alerts live, esp32-02 onboarding pending |
 
-> **Next physical step:** assemble hardware, flash firmware, confirm `SITE_ID` in `config.h` matches the PWA site key, then power on and verify Serial Monitor output.
+---
+
+## Devices in Production
+
+| Device ID | Zones | Firmware | Status |
+|---|---|---|---|
+| `esp32-01` | balcony, garden | v1.0.1 | Online |
+| `esp32-02` | balcony2, garden2 | v1.0.0 | Pending onboarding |
+
+---
+
+## Deployment Checklist
+
+After any firmware or schema change, follow this order:
+
+1. Update `database.rules.json` if paths changed
+2. Deploy rules: `firebase deploy --only database --project smarthomeapp-982da`
+3. Update firmware path helpers (`zonePath`, `devicePath`) in `irrigation_main.ino`
+4. Update all PWA files that reference Firebase paths
+5. Flash all boards (each board must be on the same schema version)
+6. Clear any stuck commands: `firebase database:remove --project smarthomeapp-982da "/irrigation/sites/default/devices/esp32-01/zones/<zone>/command"`
+7. Build and deploy PWA: `cd pwa && npm run build && firebase deploy --only hosting`
+8. Verify on Serial Monitor: confirm poll paths, heartbeat, and firmware version
+9. Verify on Firebase: `firebase database:get --project smarthomeapp-982da "/irrigation/sites/default/devices/esp32-01/meta"`
