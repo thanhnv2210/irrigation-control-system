@@ -65,6 +65,7 @@ void handleProvSave() {
 FirebaseData fbdo;         // General get/set
 FirebaseData streamZ1;     // Stream for zone 1 command
 FirebaseData streamZ2;     // Stream for zone 2 command
+FirebaseData streamConfig; // Stream for device config changes
 FirebaseAuth fbAuth;
 FirebaseConfig fbConfig;
 
@@ -103,14 +104,15 @@ struct Zone {
   uint8_t     relayPin;
   int         dryRaw;
   int         wetRaw;
+  bool        sensorEnabled;  // false = no physical sensor, skip reads
 
   bool     valveOpen;
   uint32_t valveOpenedAt;  // millis() when valve was opened
 };
 
 Zone zones[2] = {
-  { ZONE_1_ID, SENSOR_1_PIN, RELAY_1_PIN, DRY_RAW_1, WET_RAW_1, false, 0 },
-  { ZONE_2_ID, SENSOR_2_PIN, RELAY_2_PIN, DRY_RAW_2, WET_RAW_2, false, 0 },
+  { ZONE_1_ID, SENSOR_1_PIN, RELAY_1_PIN, DRY_RAW_1, WET_RAW_1, ZONE_1_SENSOR_ENABLED, false, 0 },
+  { ZONE_2_ID, SENSOR_2_PIN, RELAY_2_PIN, DRY_RAW_2, WET_RAW_2, ZONE_2_SENSOR_ENABLED, false, 0 },
 };
 
 // ---------------------------------------------------------------------------
@@ -121,6 +123,9 @@ static uint32_t lastHeartbeatMs = 0;
 static uint32_t lastFirebaseOkMs = 0;  // tracks last successful Firebase call
 static uint32_t offlineStartMs   = 0;  // millis() when connectivity was lost
 
+// Runtime config — overridable from Firebase without reflashing
+static uint32_t runtimeSensorIntervalMs = SENSOR_INTERVAL_MS;
+
 // ---------------------------------------------------------------------------
 // Path helper — all data lives under irrigation/sites/{SITE_ID}/
 // ---------------------------------------------------------------------------
@@ -129,6 +134,56 @@ static String zonePath(const char* zoneId) {
 }
 static String devicePath() {
   return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/meta";
+}
+static String configPath() {
+  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/config";
+}
+
+// ---------------------------------------------------------------------------
+// Config stream callback — applies PWA-written config changes at runtime
+// ---------------------------------------------------------------------------
+void applyConfigSensorInterval(int requested) {
+  if (requested < 10000)  requested = 10000;
+  if (requested > 300000) requested = 300000;
+  if ((uint32_t)requested != runtimeSensorIntervalMs) {
+    runtimeSensorIntervalMs = (uint32_t)requested;
+    lastSensorMs = millis() - runtimeSensorIntervalMs;  // take effect immediately
+    Serial.printf("[Config] sensorIntervalMs updated to %lu ms\n", runtimeSensorIntervalMs);
+  } else {
+    Serial.printf("[Config] sensorIntervalMs unchanged (%lu ms)\n", runtimeSensorIntervalMs);
+  }
+}
+
+void applyConfigSensorEnabled(const String& zoneId, bool enabled) {
+  for (int i = 0; i < 2; i++) {
+    if (String(zones[i].id) == zoneId) {
+      zones[i].sensorEnabled = enabled;
+      Serial.printf("[Config] Zone %s sensor %s\n", zones[i].id, enabled ? "ENABLED" : "DISABLED");
+      return;
+    }
+  }
+  Serial.printf("[Config] sensorEnabled: unknown zone '%s'\n", zoneId.c_str());
+}
+
+void configStreamCallback(StreamData data) {
+  String path  = data.dataPath();
+  String dtype = data.dataType();
+  Serial.printf("[Config] Stream fired — path=%s dataType=%s\n", path.c_str(), dtype.c_str());
+
+  lastFirebaseOkMs = millis();
+
+  if (path == "/sensorIntervalMs") {
+    if (dtype == "int" || dtype == "float" || dtype == "double" || dtype == "number") {
+      applyConfigSensorInterval((int)data.floatData());
+    }
+  } else if (path.startsWith("/sensorEnabled/")) {
+    String zoneId = path.substring(15);  // strip "/sensorEnabled/"
+    if (dtype == "boolean") {
+      applyConfigSensorEnabled(zoneId, data.boolData());
+    }
+  } else {
+    Serial.printf("[Config] Unhandled path: %s\n", path.c_str());
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +369,10 @@ void checkSchedules() {
 void readAndPublishSensors() {
   for (int i = 0; i < 2; i++) {
     Zone& z = zones[i];
+    if (!z.sensorEnabled) {
+      Serial.printf("[Zone %s] Sensor disabled — skipping read\n", z.id);
+      continue;
+    }
     int raw = analogRead(z.sensorPin);
     int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
 
@@ -355,7 +414,7 @@ void publishHeartbeat() {
   json.set("lastSeen/.sv",      "timestamp");
   json.set("ipAddress",         WiFi.localIP().toString());
   json.set("wifiRssi",          WiFi.RSSI());
-  json.set("sensorIntervalMs",  (int)SENSOR_INTERVAL_MS);
+  json.set("sensorIntervalMs",  (int)runtimeSensorIntervalMs);
   json.set("maxValveMs",        (int)MAX_VALVE_MS);
 
   if (Firebase.updateNode(fbdo, devicePath(), json)) {
@@ -406,16 +465,15 @@ void handleCommand(int zoneIdx, const String& action) {
 // ---------------------------------------------------------------------------
 void reportZoneStatus(int zoneIdx) {
   Zone& z = zones[zoneIdx];
-  int raw = analogRead(z.sensorPin);
-  int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
-
-  Serial.printf("[Zone %s] Status — valve: %s | moisture: %d%% (raw %d) | uptime: %lus\n",
-    z.id,
-    z.valveOpen ? "OPEN" : "CLOSED",
-    pct,
-    raw,
-    millis() / 1000
-  );
+  if (z.sensorEnabled) {
+    int raw = analogRead(z.sensorPin);
+    int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
+    Serial.printf("[Zone %s] Status — valve: %s | moisture: %d%% (raw %d) | uptime: %lus\n",
+      z.id, z.valveOpen ? "OPEN" : "CLOSED", pct, raw, millis() / 1000);
+  } else {
+    Serial.printf("[Zone %s] Status — valve: %s | sensor: disabled | uptime: %lus\n",
+      z.id, z.valveOpen ? "OPEN" : "CLOSED", millis() / 1000);
+  }
 }
 
 // Stream callbacks
@@ -655,6 +713,37 @@ void setup() {
     // Load schedules on boot
     loadSchedules();
     lastScheduleReloadMs = millis();
+
+    // Read runtime config on boot
+    if (Firebase.getInt(fbdo, configPath() + "/sensorIntervalMs")) {
+      int val = fbdo.intData();
+      if (val >= 10000 && val <= 300000) {
+        runtimeSensorIntervalMs = (uint32_t)val;
+        Serial.printf("[Config] Boot: sensorIntervalMs = %lu ms (from Firebase)\n", runtimeSensorIntervalMs);
+      }
+    } else {
+      Serial.println("[Config] No saved sensorIntervalMs — using config.h default");
+    }
+
+    for (int i = 0; i < 2; i++) {
+      String path = configPath() + "/sensorEnabled/" + zones[i].id;
+      if (Firebase.getBool(fbdo, path)) {
+        zones[i].sensorEnabled = fbdo.boolData();
+        Serial.printf("[Config] Boot: zone %s sensor %s\n",
+          zones[i].id, zones[i].sensorEnabled ? "ENABLED" : "DISABLED");
+      } else {
+        // Path doesn't exist yet — write the compile-time default so PWA can see it
+        Firebase.setBool(fbdo, path, zones[i].sensorEnabled);
+        Serial.printf("[Config] Boot: zone %s sensor default written (%s)\n",
+          zones[i].id, zones[i].sensorEnabled ? "enabled" : "disabled");
+      }
+    }
+
+    // Stream the full config/ node — callback routes on dataPath()
+    if (!Firebase.beginStream(streamConfig, configPath())) {
+      Serial.printf("[Firebase] Config stream failed: %s\n", streamConfig.errorReason().c_str());
+    }
+    Firebase.setStreamCallback(streamConfig, configStreamCallback, streamTimeoutCallback);
   } else {
     Serial.println("[Firebase] Not ready after timeout — continuing, watchdog will restart if needed");
   }
@@ -754,6 +843,7 @@ void checkWifi() {
 static uint32_t lastStreamCheckMs = 0;
 
 void pollCommand(int zoneIdx) {
+  if (!zones[zoneIdx].sensorEnabled) return;  // no sensor = zone not active, skip polling
   String cmdPath = zonePath(zones[zoneIdx].id) + "/command/action";
   Serial.printf("[Cmd] Polling %s → %s\n", zones[zoneIdx].id, cmdPath.c_str());
   if (Firebase.getString(fbdo, cmdPath)) {
@@ -802,8 +892,8 @@ void loop() {
   // Safety check runs every iteration — no timer needed
   enforceValveSafety();
 
-  // Sensor publish every SENSOR_INTERVAL_MS
-  if (millis() - lastSensorMs >= SENSOR_INTERVAL_MS) {
+  // Sensor publish every runtimeSensorIntervalMs (default SENSOR_INTERVAL_MS, overridable via Firebase)
+  if (millis() - lastSensorMs >= runtimeSensorIntervalMs) {
     lastSensorMs = millis();
     if (Firebase.ready()) {
       readAndPublishSensors();
