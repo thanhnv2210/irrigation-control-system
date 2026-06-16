@@ -351,10 +351,12 @@ void readAndPublishSensors() {
 // ---------------------------------------------------------------------------
 void publishHeartbeat() {
   FirebaseJson json;
-  json.set("firmware",      FIRMWARE_VERSION);
-  json.set("lastSeen/.sv",  "timestamp");
-  json.set("ipAddress",     WiFi.localIP().toString());
-  json.set("wifiRssi",      WiFi.RSSI());
+  json.set("firmware",          FIRMWARE_VERSION);
+  json.set("lastSeen/.sv",      "timestamp");
+  json.set("ipAddress",         WiFi.localIP().toString());
+  json.set("wifiRssi",          WiFi.RSSI());
+  json.set("sensorIntervalMs",  (int)SENSOR_INTERVAL_MS);
+  json.set("maxValveMs",        (int)MAX_VALVE_MS);
 
   if (Firebase.updateNode(fbdo, devicePath(), json)) {
     lastFirebaseOkMs = millis();

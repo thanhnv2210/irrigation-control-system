@@ -96,6 +96,14 @@ function DeviceStatus({ deviceId }) {
     ? `Last disconnect: ${diag.reason?.replace('_', ' ')} — offline ${diag.offlineSec}s — RSSI ${diag.wifiRssi} dBm — heap ${diag.freeHeap} — ${diag.timestamp ? new Date(diag.timestamp).toLocaleString() : ''}`
     : null
 
+  function fmtInterval(ms) {
+    if (!ms) return null
+    if (ms < 60000) return `${ms / 1000}s`
+    return `${ms / 60000}m`
+  }
+  const sensorInterval = fmtInterval(device.sensorIntervalMs)
+  const maxValve       = fmtInterval(device.maxValveMs)
+
   function startRename() {
     setEditName(displayName)
     setRenaming(true)
@@ -127,7 +135,13 @@ function DeviceStatus({ deviceId }) {
         <>
           <span style={styles.deviceText}>
             <strong style={{ color: online ? '#1a7f4b' : '#e05c3a' }}>{displayName}</strong>
-            {' '}{online ? 'online' : 'offline'} — {device.ipAddress} — RSSI {device.wifiRssi} dBm — last seen {lastSeen}
+            {' '}{online ? 'online' : 'offline'}
+            {device.firmware    && ` — fw v${device.firmware}`}
+            {sensorInterval     && ` — sensor every ${sensorInterval}`}
+            {maxValve           && ` — valve max ${maxValve}`}
+            {device.ipAddress   && ` — ${device.ipAddress}`}
+            {device.wifiRssi    && ` — RSSI ${device.wifiRssi} dBm`}
+            {` — last seen ${lastSeen}`}
             {diagText && <><br /><span style={{ color: '#e0b03a' }}>{diagText}</span></>}
           </span>
           {!isGuest && <button style={styles.iconBtn} onClick={startRename} title="Rename device">✎</button>}

@@ -90,7 +90,9 @@ function DeviceSimulator() {
         firmware: '1.0.0-sim',
         ipAddress: '127.0.0.1',
         wifiRssi: -45,
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        sensorIntervalMs: interval.ms,
+        maxValveMs: 600000
       })
     }
 
