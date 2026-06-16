@@ -67,6 +67,7 @@ function ZoneCard({ zoneId, deviceId, label }) {
 
 function DeviceStatus({ deviceId }) {
   const device = useDeviceData(deviceId)
+  const [open, setOpen] = useState(false)
 
   if (!device) return null
 
@@ -90,17 +91,24 @@ function DeviceStatus({ deviceId }) {
   return (
     <div style={styles.deviceBar}>
       <span style={{ ...styles.dot, background: online ? '#1a7f4b' : '#e05c3a' }} />
-      <span style={styles.deviceText}>
-        <strong style={{ color: online ? '#1a7f4b' : '#e05c3a' }}>{displayName}</strong>
-        {' '}{online ? 'online' : 'offline'}
-        {device.firmware  && ` — fw v${device.firmware}`}
-        {fmtMs(device.sensorIntervalMs) && ` — sensor every ${fmtMs(device.sensorIntervalMs)}`}
-        {fmtMs(device.maxValveMs)       && ` — valve max ${fmtMs(device.maxValveMs)}`}
-        {device.ipAddress && ` — ${device.ipAddress}`}
-        {device.wifiRssi  && ` — RSSI ${device.wifiRssi} dBm`}
-        {` — last seen ${lastSeen}`}
-        {diagText && <><br /><span style={{ color: '#e0b03a' }}>{diagText}</span></>}
-      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <button style={styles.deviceBarBtn} onClick={() => setOpen(o => !o)}>
+          <span style={{ color: online ? '#1a7f4b' : '#e05c3a', fontWeight: 700 }}>{displayName}</span>
+          <span style={{ color: '#7aab90' }}>{' '}{online ? 'online' : 'offline'}</span>
+          <span style={styles.deviceLastSeen}>— last seen {lastSeen}</span>
+          <span style={styles.deviceChevron}>{open ? '▲' : '▼'}</span>
+        </button>
+        {open && (
+          <div style={styles.deviceDetails}>
+            {device.firmware  && <span>Firmware: v{device.firmware}</span>}
+            {fmtMs(device.sensorIntervalMs) && <span>Sensor interval: {fmtMs(device.sensorIntervalMs)}</span>}
+            {fmtMs(device.maxValveMs)       && <span>Valve max: {fmtMs(device.maxValveMs)}</span>}
+            {device.ipAddress && <span>IP: {device.ipAddress}</span>}
+            {device.wifiRssi  && <span>RSSI: {device.wifiRssi} dBm</span>}
+            {diagText && <span style={{ color: '#e0b03a' }}>{diagText}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -151,8 +159,11 @@ const styles = {
   gaugeFill:    { height: '100%', borderRadius: '5px', transition: 'width 0.5s ease' },
   gaugePct:     { fontSize: '0.9rem', fontWeight: 700, minWidth: '36px', textAlign: 'right' },
   meta:         { display: 'flex', flexDirection: 'column', gap: '0.3rem', color: '#7aab90', fontSize: '0.82rem' },
-  deviceBar:    { display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#1e2d24', borderRadius: '8px', padding: '0.75rem 1rem' },
-  dot:          { width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0 },
-  deviceText:   { color: '#7aab90', fontSize: '0.8rem', flex: 1 },
+  deviceBar:      { display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: '#1e2d24', borderRadius: '8px', padding: '0.75rem 1rem' },
+  dot:            { width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0, marginTop: '5px' },
+  deviceBarBtn:   { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.82rem', width: '100%', textAlign: 'left', flexWrap: 'wrap' },
+  deviceLastSeen: { color: '#5a8a70', fontSize: '0.78rem', flexShrink: 0 },
+  deviceChevron:  { color: '#3a5a45', fontSize: '0.7rem', marginLeft: 'auto' },
+  deviceDetails:  { display: 'flex', flexDirection: 'column', gap: '0.25rem', color: '#7aab90', fontSize: '0.78rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #2e4a38' },
   empty:        { color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' },
 }
