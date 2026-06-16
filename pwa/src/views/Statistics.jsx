@@ -6,10 +6,29 @@ import {
 import { useHistory, useHistoryByDate } from '../hooks/useHistory'
 import { useSite } from '../context/SiteContext'
 const RANGES  = [
-  { label: '4h',  points: 24  },
-  { label: '8h',  points: 48  },
-  { label: '24h', points: 144 },
+  { label: '4h',  windowMs: 4  * 60 * 60 * 1000 },
+  { label: '8h',  windowMs: 8  * 60 * 60 * 1000 },
+  { label: '24h', windowMs: 24 * 60 * 60 * 1000 },
 ]
+
+const SMOOTHING = [
+  { label: 'Off', window: 1  },
+  { label: '5pt', window: 5  },
+  { label: '10pt',window: 10 },
+  { label: '20pt',window: 20 },
+]
+
+function applyMovingAverage(data, windowSize) {
+  if (windowSize <= 1) return data
+  const half = Math.floor(windowSize / 2)
+  return data.map((d, i) => {
+    const start = Math.max(0, i - half)
+    const end   = Math.min(data.length, i + half + 1)
+    const slice = data.slice(start, end)
+    const avg   = slice.reduce((sum, p) => sum + p.moisture, 0) / slice.length
+    return { ...d, moisture: Math.round(avg * 10) / 10 }
+  })
+}
 
 function todayStr() {
   const d = new Date()
@@ -56,18 +75,19 @@ function buildWateringBands(history, data) {
   return bands
 }
 
-function ZoneChart({ zoneId, deviceId, label, mode, range, dateStr }) {
-  const recent = useHistory({ zoneId, deviceId }, range.points)
+function ZoneChart({ zoneId, deviceId, label, mode, range, dateStr, smoothingWindow }) {
+  const recent = useHistory({ zoneId, deviceId }, range.windowMs)
   const byDate = useHistoryByDate({ zoneId, deviceId }, mode === 'date' ? dateStr : null)
 
   const { history, loading } = mode === 'date' ? byDate : recent
 
-  const data = history.map(h => ({
+  const rawData = history.map(h => ({
     time:     formatTime(h.timestamp),
     fullTime: new Date(h.timestamp).toLocaleTimeString(),
     moisture: h.moisturePercent,
     valveOpen: !!h.valveOpen
   }))
+  const data = applyMovingAverage(rawData, smoothingWindow)
 
   const values  = history.map(h => h.moisturePercent)
   const avg     = values.length ? Math.round(values.reduce((a,b) => a+b, 0) / values.length) : null
@@ -161,7 +181,11 @@ function ZoneChart({ zoneId, deviceId, label, mode, range, dateStr }) {
             </LineChart>
           </ResponsiveContainer>
 
-          <p style={styles.hint}>{data.length} readings{waterBands.length > 0 ? ' · green bands = irrigation active' : ''}</p>
+          <p style={styles.hint}>
+            {rawData.length} readings
+            {smoothingWindow > 1 ? ` · ${smoothingWindow}-point moving avg` : ''}
+            {waterBands.length > 0 ? ' · green bands = irrigation active' : ''}
+          </p>
         </>
       )}
     </div>
@@ -170,9 +194,10 @@ function ZoneChart({ zoneId, deviceId, label, mode, range, dateStr }) {
 
 export default function Statistics() {
   const { zones } = useSite()
-  const [mode,    setMode]    = useState('recent')   // 'recent' | 'date'
-  const [range,   setRange]   = useState(RANGES[1])  // default 8h
-  const [dateStr, setDateStr] = useState(todayStr)
+  const [mode,      setMode]      = useState('recent')      // 'recent' | 'date'
+  const [range,     setRange]     = useState(RANGES[1])     // default 8h
+  const [dateStr,   setDateStr]   = useState(todayStr)
+  const [smoothing, setSmoothing] = useState(SMOOTHING[0])  // default Off
 
   return (
     <div style={styles.page}>
@@ -188,7 +213,7 @@ export default function Statistics() {
         >By Date</button>
       </div>
 
-      {/* Controls */}
+      {/* Time range / date controls */}
       {mode === 'recent' ? (
         <div style={styles.rangeRow}>
           {RANGES.map(r => (
@@ -211,6 +236,18 @@ export default function Statistics() {
         </div>
       )}
 
+      {/* Smoothing controls */}
+      <div style={styles.smoothRow}>
+        <span style={styles.smoothLabel}>Smooth</span>
+        {SMOOTHING.map(s => (
+          <button
+            key={s.label}
+            style={{ ...styles.rangeBtn, ...(smoothing.label === s.label ? styles.rangeActive : {}) }}
+            onClick={() => setSmoothing(s)}
+          >{s.label}</button>
+        ))}
+      </div>
+
       {zones.length === 0 && (
         <p style={{ color: '#3a5a45', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
           No zones configured for this site.
@@ -225,6 +262,7 @@ export default function Statistics() {
           mode={mode}
           range={range}
           dateStr={dateStr}
+          smoothingWindow={smoothing.window}
         />
       ))}
     </div>
@@ -237,6 +275,8 @@ const styles = {
   modeBtn:     { flex: 1, padding: '0.65rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.9rem', cursor: 'pointer' },
   modeActive:  { background: '#2e4a38', color: '#e0f0e8', borderColor: '#1a7f4b', fontWeight: 600 },
   rangeRow:    { display: 'flex', gap: '0.5rem' },
+  smoothRow:   { display: 'flex', gap: '0.5rem', alignItems: 'center' },
+  smoothLabel: { color: '#7aab90', fontSize: '0.82rem', marginRight: '0.25rem', whiteSpace: 'nowrap' },
   rangeBtn:    { padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.9rem', cursor: 'pointer' },
   rangeActive: { background: '#1a7f4b', color: '#fff', borderColor: '#1a7f4b' },
   dateRow:     { display: 'flex' },

@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
-import { ref, query, orderByChild, limitToLast, startAt, endAt, onValue } from 'firebase/database'
+import { ref, query, orderByChild, startAt, endAt, onValue } from 'firebase/database'
 import { db } from '../firebase'
 import { useSite } from '../context/SiteContext'
 
-export function useHistory({ zoneId, deviceId }, limit = 48) {
+export function useHistory({ zoneId, deviceId }, windowMs) {
   const { sitePath } = useSite()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!zoneId || !deviceId) return
+    const startTs = Date.now() - windowMs
     const histRef = query(
       ref(db, sitePath(`devices/${deviceId}/zones/${zoneId}/history`)),
       orderByChild('timestamp'),
-      limitToLast(limit)
+      startAt(startTs)
     )
     const unsub = onValue(histRef, snap => {
       if (!snap.exists()) { setHistory([]); setLoading(false); return }
@@ -22,7 +23,7 @@ export function useHistory({ zoneId, deviceId }, limit = 48) {
       setLoading(false)
     })
     return unsub
-  }, [zoneId, deviceId, limit, sitePath])
+  }, [zoneId, deviceId, windowMs, sitePath])
 
   return { history, loading }
 }
