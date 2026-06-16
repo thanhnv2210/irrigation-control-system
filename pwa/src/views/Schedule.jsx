@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ref, set, remove, push } from 'firebase/database'
 import { db } from '../firebase'
-import { useZoneData } from '../hooks/useZoneData'
+import { useZoneData, useDeviceData } from '../hooks/useZoneData'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
 import { useAuth } from '../App'
@@ -77,7 +77,6 @@ function ScheduleForm({ zoneId, deviceId, initial, onDone }) {
 
 function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
   const { sitePath } = useSite()
-  const { isGuest } = useAuth()
   const days = (entry.days ?? []).map(d => DAY_LABELS[d]).join(', ')
   const time = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`
 
@@ -96,7 +95,7 @@ function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
         <span style={styles.itemTime}>{time}</span>
         <span style={styles.itemMeta}>{entry.durationMinutes} min — {days}</span>
       </div>
-      {!isGuest && (
+      {onEdit && (
         <div style={styles.itemActions}>
           <button style={styles.iconBtn} onClick={toggle}>{entry.enabled ? 'Disable' : 'Enable'}</button>
           <button style={styles.iconBtn} onClick={() => onEdit({ ...entry, _id: id })}>Edit</button>
@@ -107,28 +106,44 @@ function ScheduleItem({ zoneId, deviceId, id, entry, onEdit }) {
   )
 }
 
+function useDeviceOnline(deviceId) {
+  const device = useDeviceData(deviceId)
+  const age                = device?.lastSeen ? Math.floor((Date.now() - device.lastSeen) / 1000) : null
+  const heartbeatMs        = device?.heartbeatIntervalMs ?? 60000
+  const onlineThresholdSec = Math.ceil((heartbeatMs * 2) / 1000)
+  return age !== null && age < onlineThresholdSec
+}
+
 function ZoneSchedule({ zoneId, deviceId, label }) {
   const { schedule } = useZoneData({ zoneId, deviceId })
   const { isGuest } = useAuth()
+  const online = useDeviceOnline(deviceId)
   const [editing, setEditing] = useState(null)  // null | {} | { _id, ...entry }
+
+  const canEdit = !isGuest && online
 
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
         <span style={styles.zoneName}>{label}</span>
-        {!isGuest && <button style={styles.addBtn} onClick={() => setEditing({})}>+ Add</button>}
+        {canEdit && <button style={styles.addBtn} onClick={() => setEditing({})}>+ Add</button>}
       </div>
+
+      {!online && (
+        <div style={styles.offlineBanner}>Device offline — schedule editing disabled</div>
+      )}
 
       {editing !== null && (
         <ScheduleForm zoneId={zoneId} deviceId={deviceId} initial={editing._id ? editing : null} onDone={() => setEditing(null)} />
       )}
 
       {Object.keys(schedule).length === 0 && editing === null && (
-        <p style={styles.empty}>No schedules{isGuest ? '.' : ' — tap + Add to create one.'}</p>
+        <p style={styles.empty}>No schedules{canEdit ? ' — tap + Add to create one.' : '.'}</p>
       )}
 
       {Object.entries(schedule).map(([id, entry]) => (
-        <ScheduleItem key={id} zoneId={zoneId} deviceId={deviceId} id={id} entry={entry} onEdit={setEditing} />
+        <ScheduleItem key={id} zoneId={zoneId} deviceId={deviceId} id={id} entry={entry}
+          onEdit={canEdit ? setEditing : null} />
       ))}
     </div>
   )
@@ -154,6 +169,7 @@ const styles = {
   cardHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' },
   zoneName:    { color: '#e0f0e8', fontSize: '1.1rem', fontWeight: 600 },
   addBtn:      { background: '#1a7f4b', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.55rem 1.1rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' },
+  offlineBanner: { background: '#2a1a1a', color: '#e05c3a', fontSize: '0.85rem', padding: '0.6rem 0.85rem', borderRadius: '8px', marginBottom: '0.75rem' },
   empty:       { color: '#7aab90', fontSize: '0.88rem', textAlign: 'center', padding: '1rem 0' },
   item:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.9rem 0', borderTop: '1px solid #2e4a38', gap: '0.5rem' },
   itemInfo:    { display: 'flex', flexDirection: 'column', gap: '0.25rem' },

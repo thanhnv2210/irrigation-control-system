@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ref, set, serverTimestamp } from 'firebase/database'
 import { db } from '../firebase'
-import { useZoneData } from '../hooks/useZoneData'
+import { useZoneData, useDeviceData } from '../hooks/useZoneData'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { logAudit } from '../utils/audit'
 import { useSite } from '../context/SiteContext'
@@ -20,7 +20,7 @@ function formatDuration(totalSeconds) {
   return `${m}m ${s}s`
 }
 
-function ZoneControl({ zoneId, deviceId, label }) {
+function ZoneControl({ zoneId, deviceId, label, deviceOnline }) {
   const { valve, command } = useZoneData({ zoneId, deviceId })
   const { sitePath } = useSite()
   const { isGuest } = useAuth()
@@ -57,7 +57,11 @@ function ZoneControl({ zoneId, deviceId, label }) {
         </span>
       </div>
 
-      {hasPending && (
+      {!deviceOnline && (
+        <div style={styles.offlineBanner}>Device offline — controls disabled</div>
+      )}
+
+      {hasPending && deviceOnline && (
         <div style={styles.pendingBanner}>
           Command pending: {command.action} — waiting for device...
         </div>
@@ -65,7 +69,7 @@ function ZoneControl({ zoneId, deviceId, label }) {
 
       {isGuest ? (
         <p style={styles.guestNotice}>Sign in to control valves</p>
-      ) : (
+      ) : deviceOnline ? (
         <>
           <div style={styles.durationRow}>
             <span style={styles.durationLabel}>Duration</span>
@@ -101,7 +105,7 @@ function ZoneControl({ zoneId, deviceId, label }) {
             </button>
           </div>
         </>
-      )}
+      ) : null}
 
       {pending && (
         <ConfirmDialog
@@ -114,18 +118,35 @@ function ZoneControl({ zoneId, deviceId, label }) {
   )
 }
 
+function DeviceOnlineGate({ deviceId, children }) {
+  const device = useDeviceData(deviceId)
+  const age                = device?.lastSeen ? Math.floor((Date.now() - device.lastSeen) / 1000) : null
+  const heartbeatMs        = device?.heartbeatIntervalMs ?? 60000
+  const onlineThresholdSec = Math.ceil((heartbeatMs * 2) / 1000)
+  const online             = age !== null && age < onlineThresholdSec
+  return children(online)
+}
+
 export default function Control() {
-  const { zones } = useSite()
+  const { zones, devices } = useSite()
+
+  // Group zones by deviceId for per-device online check
+  const deviceIds = [...new Set(zones.map(z => z.deviceId).filter(Boolean))]
+
   return (
     <div style={styles.page}>
       <p style={styles.note}>
-        OPEN commands require confirmation. Set duration (30s–9m, in 30s steps) before opening.
+        OPEN commands require confirmation. Set duration (30s–3m, in 30s steps) before opening.
       </p>
       {zones.length === 0 && (
         <p style={styles.empty}>No zones configured for this site.</p>
       )}
       {zones.map(z => (
-        <ZoneControl key={z.id} zoneId={z.id} deviceId={z.deviceId} label={z.label} />
+        <DeviceOnlineGate key={z.id} deviceId={z.deviceId}>
+          {online => (
+            <ZoneControl zoneId={z.id} deviceId={z.deviceId} label={z.label} deviceOnline={online} />
+          )}
+        </DeviceOnlineGate>
       ))}
     </div>
   )
@@ -138,6 +159,7 @@ const styles = {
   header:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' },
   label:         { color: '#e0f0e8', fontSize: '1.1rem', fontWeight: 600 },
   badge:         { color: '#fff', fontSize: '0.78rem', fontWeight: 700, padding: '0.3rem 0.7rem', borderRadius: '6px' },
+  offlineBanner: { background: '#2a1a1a', color: '#e05c3a', fontSize: '0.85rem', padding: '0.6rem 0.85rem', borderRadius: '8px', marginBottom: '0.75rem' },
   pendingBanner: { background: '#2a3d2e', color: '#e0b03a', fontSize: '0.85rem', padding: '0.6rem 0.85rem', borderRadius: '8px', marginBottom: '0.75rem' },
   durationRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' },
   durationLabel:   { color: '#7aab90', fontSize: '0.9rem' },
