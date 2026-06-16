@@ -852,7 +852,7 @@ void checkWifi() {
 static uint32_t lastStreamCheckMs = 0;
 
 void pollCommand(int zoneIdx) {
-  if (!zones[zoneIdx].sensorEnabled) return;  // no sensor = zone not active, skip polling
+  // Note: sensorEnabled only disables sensor reads — valve commands are always polled
   String cmdPath = zonePath(zones[zoneIdx].id) + "/command/action";
   Serial.printf("[Cmd] Polling %s → %s\n", zones[zoneIdx].id, cmdPath.c_str());
   if (Firebase.getString(fbdo, cmdPath)) {

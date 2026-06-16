@@ -8,7 +8,7 @@ import { useSite } from '../context/SiteContext'
 import { useAuth } from '../App'
 
 const MIN_SECONDS     = 30       // 30 seconds minimum
-const MAX_SECONDS     = 9 * 60  // 9 minutes maximum
+const MAX_SECONDS     = 3 * 60  // 3 minutes maximum (matches firmware MAX_VALVE_MS)
 const DEFAULT_SECONDS = 30      // default: 0 min 30 sec
 const STEP_SECONDS    = 30      // increment/decrement in 30s steps
 

@@ -67,7 +67,7 @@
 #define RELAY_2_PIN           27
 
 // Safety and timing (milliseconds)
-#define MAX_VALVE_MS           600000UL   // 10 minutes — DO NOT reduce
+#define MAX_VALVE_MS           180000UL   // 3 minutes
 #define SENSOR_INTERVAL_MS     30000UL    // 30 seconds — overridable via PWA
 #define HEARTBEAT_INTERVAL_MS  60000UL    // 60 seconds
 #define FIREBASE_TIMEOUT_MS    300000UL   // 5 minutes
