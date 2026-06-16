@@ -10,7 +10,9 @@
   #define DEVICE_ID             "esp32-01"
   #define DEVICE_NAME           "Irrigation Controller 01"
   #define ZONE_1_ID             "balcony"
+  #define ZONE_1_NAME           "Balcony"
   #define ZONE_2_ID             "garden"
+  #define ZONE_2_NAME           "Garden"
   #define FIRMWARE_VERSION      "1.0.0"
   #define ZONE_1_SENSOR_ENABLED  1
   #define ZONE_2_SENSOR_ENABLED  1
@@ -27,7 +29,9 @@
   #define DEVICE_ID             "esp32-02"
   #define DEVICE_NAME           "Irrigation Controller 02"
   #define ZONE_1_ID             "balcony2"
+  #define ZONE_1_NAME           "Balcony 2"
   #define ZONE_2_ID             "garden2"
+  #define ZONE_2_NAME           "Garden 2"
   #define FIRMWARE_VERSION      "1.0.0"
   #define ZONE_1_SENSOR_ENABLED  1
   #define ZONE_2_SENSOR_ENABLED  1

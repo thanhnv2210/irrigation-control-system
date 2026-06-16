@@ -100,6 +100,7 @@ static uint32_t lastScheduleReloadMs = 0;
 // ---------------------------------------------------------------------------
 struct Zone {
   const char* id;
+  const char* name;           // display name — initialised to Firebase meta/name on first flash
   uint8_t     sensorPin;
   uint8_t     relayPin;
   int         dryRaw;
@@ -111,8 +112,8 @@ struct Zone {
 };
 
 Zone zones[2] = {
-  { ZONE_1_ID, SENSOR_1_PIN, RELAY_1_PIN, DRY_RAW_1, WET_RAW_1, ZONE_1_SENSOR_ENABLED, false, 0 },
-  { ZONE_2_ID, SENSOR_2_PIN, RELAY_2_PIN, DRY_RAW_2, WET_RAW_2, ZONE_2_SENSOR_ENABLED, false, 0 },
+  { ZONE_1_ID, ZONE_1_NAME, SENSOR_1_PIN, RELAY_1_PIN, DRY_RAW_1, WET_RAW_1, ZONE_1_SENSOR_ENABLED, false, 0 },
+  { ZONE_2_ID, ZONE_2_NAME, SENSOR_2_PIN, RELAY_2_PIN, DRY_RAW_2, WET_RAW_2, ZONE_2_SENSOR_ENABLED, false, 0 },
 };
 
 // ---------------------------------------------------------------------------
@@ -203,9 +204,9 @@ void openValve(int zoneIdx, const char* openedBy) {
   Serial.printf("[Zone %s] Relay pin %d set LOW (open)\n", z.id, z.relayPin);
 
   String base = zonePath(z.id);
-  bool ok1 = Firebase.setString(fbdo, base + "/valve/state",    "OPEN");
-  bool ok2 = Firebase.setString(fbdo, base + "/valve/openedBy", openedBy);
-  bool ok3 = Firebase.setInt   (fbdo, base + "/valve/lastChangedAt", (int)millis());
+  bool ok1 = Firebase.setString(fbdo, base + "/valve/state",         "OPEN");
+  bool ok2 = Firebase.setString(fbdo, base + "/valve/openedBy",      openedBy);
+  bool ok3 = Firebase.setTimestamp(fbdo, base + "/valve/lastChangedAt");
   Serial.printf("[Zone %s] Valve OPEN (by %s) — Firebase writes: state=%s openedBy=%s ts=%s\n",
     z.id, openedBy,
     ok1 ? "ok" : fbdo.errorReason().c_str(),
@@ -233,7 +234,7 @@ void closeValve(int zoneIdx) {
 
   String base = zonePath(z.id);
   bool ok = Firebase.setString(fbdo, base + "/valve/state", "CLOSED");
-  Firebase.setInt(fbdo, base + "/valve/lastChangedAt", (int)millis());
+  Firebase.setTimestamp(fbdo, base + "/valve/lastChangedAt");
   Serial.printf("[Zone %s] Valve CLOSED — Firebase write: %s\n", z.id, ok ? "ok" : fbdo.errorReason().c_str());
 }
 
@@ -432,12 +433,14 @@ void handleCommand(int zoneIdx, const String& action) {
   Serial.printf("[Cmd] handleCommand zone=%s action=%s\n", zones[zoneIdx].id, action.c_str());
 
   if (action == "OPEN") {
-    // Read durationSeconds from command — default 30s, clamp 30–540s (9 min)
+    // Read durationSeconds from command — default 30s, clamp to MAX_VALVE_MS
+    const int maxDurationSeconds = (int)(MAX_VALVE_MS / 1000UL);
     int durationSeconds = 30;
     if (Firebase.getInt(fbdo, cmdBase + "/durationSeconds")) {
       int val = fbdo.intData();
       Serial.printf("[Cmd] durationSeconds from Firebase: %d\n", val);
-      if (val >= 30 && val <= 540) durationSeconds = val;
+      if (val >= 30 && val <= maxDurationSeconds) durationSeconds = val;
+      else if (val > maxDurationSeconds) durationSeconds = maxDurationSeconds;
     } else {
       Serial.printf("[Cmd] durationSeconds read failed: %s — using default 30s\n", fbdo.errorReason().c_str());
     }
@@ -678,9 +681,9 @@ void setup() {
       String metaPath = zonePath(zones[i].id) + "/meta";
       bool exists = Firebase.getString(fbdo, metaPath + "/name") && fbdo.stringData().length() > 0;
       if (!exists) {
-        Firebase.setString(fbdo, metaPath + "/name",    zones[i].id);
+        Firebase.setString(fbdo, metaPath + "/name",    zones[i].name);
         Firebase.setBool  (fbdo, metaPath + "/enabled", true);
-        Serial.printf("[Zone %s] Meta initialised\n", zones[i].id);
+        Serial.printf("[Zone %s] Meta initialised with name: %s\n", zones[i].id, zones[i].name);
       } else {
         Serial.printf("[Zone %s] Name kept: %s\n", zones[i].id, fbdo.stringData().c_str());
       }
