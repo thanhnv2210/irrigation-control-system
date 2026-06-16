@@ -414,8 +414,9 @@ void publishHeartbeat() {
   json.set("lastSeen/.sv",      "timestamp");
   json.set("ipAddress",         WiFi.localIP().toString());
   json.set("wifiRssi",          WiFi.RSSI());
-  json.set("sensorIntervalMs",  (int)runtimeSensorIntervalMs);
-  json.set("maxValveMs",        (int)MAX_VALVE_MS);
+  json.set("sensorIntervalMs",   (int)runtimeSensorIntervalMs);
+  json.set("heartbeatIntervalMs",(int)HEARTBEAT_INTERVAL_MS);
+  json.set("maxValveMs",         (int)MAX_VALVE_MS);
 
   if (Firebase.updateNode(fbdo, devicePath(), json)) {
     lastFirebaseOkMs = millis();

@@ -72,8 +72,10 @@ function DeviceStatus({ deviceId }) {
 
   const displayName = device.name || deviceId
   const lastSeen    = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : '—'
-  const age         = device.lastSeen ? Math.floor((Date.now() - device.lastSeen) / 1000) : null
-  const online      = age !== null && age < 90
+  const age                = device.lastSeen ? Math.floor((Date.now() - device.lastSeen) / 1000) : null
+  const heartbeatMs        = device.heartbeatIntervalMs ?? 60000
+  const onlineThresholdSec = Math.ceil((heartbeatMs * 2) / 1000)
+  const online             = age !== null && age < onlineThresholdSec
 
   const diag = device.lastDiagnostic
   const diagText = diag

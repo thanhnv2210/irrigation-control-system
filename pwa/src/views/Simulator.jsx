@@ -92,6 +92,7 @@ function DeviceSimulator() {
         wifiRssi: -45,
         lastSeen: Date.now(),
         sensorIntervalMs: interval.ms,
+        heartbeatIntervalMs: 60000,
         maxValveMs: 600000
       })
     }
