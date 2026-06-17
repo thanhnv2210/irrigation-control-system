@@ -638,6 +638,7 @@ void setup() {
   fbdo.setBSSLBufferSize(4096, 1024);
   streamZ1.setBSSLBufferSize(4096, 1024);
   streamZ2.setBSSLBufferSize(4096, 1024);
+  streamConfig.setBSSLBufferSize(4096, 1024);
 
   Firebase.begin(&fbConfig, &fbAuth);
 
@@ -726,28 +727,34 @@ void setup() {
     loadSchedules();
     lastScheduleReloadMs = millis();
 
-    // Read runtime config on boot
-    if (Firebase.getInt(fbdo, configPath() + "/sensorIntervalMs")) {
+    // Write config defaults if not yet set — device account may lack read permission on config/
+    // The config poll in loop() will read and apply the current values within 10s
+    String intervalPath = configPath() + "/sensorIntervalMs";
+    if (!Firebase.getInt(fbdo, intervalPath)) {
+      // Path doesn't exist — write compile-time default so PWA can discover it
+      Firebase.setInt(fbdo, intervalPath, (int)SENSOR_INTERVAL_MS);
+      Serial.printf("[Config] Boot: sensorIntervalMs default written (%lu ms)\n", SENSOR_INTERVAL_MS);
+    } else {
       int val = fbdo.intData();
       if (val >= 10000 && val <= 300000) {
         runtimeSensorIntervalMs = (uint32_t)val;
         Serial.printf("[Config] Boot: sensorIntervalMs = %lu ms (from Firebase)\n", runtimeSensorIntervalMs);
+      } else {
+        Serial.println("[Config] Boot: sensorIntervalMs out of range — using config.h default");
       }
-    } else {
-      Serial.println("[Config] No saved sensorIntervalMs — using config.h default");
     }
 
     for (int i = 0; i < 2; i++) {
       String path = configPath() + "/sensorEnabled/" + zones[i].id;
-      if (Firebase.getBool(fbdo, path)) {
+      if (!Firebase.getBool(fbdo, path)) {
+        // Path doesn't exist — write compile-time default
+        Firebase.setBool(fbdo, path, (bool)zones[i].sensorEnabled);
+        Serial.printf("[Config] Boot: zone %s sensor default written (%s)\n",
+          zones[i].id, zones[i].sensorEnabled ? "enabled" : "disabled");
+      } else {
         zones[i].sensorEnabled = fbdo.boolData();
         Serial.printf("[Config] Boot: zone %s sensor %s\n",
           zones[i].id, zones[i].sensorEnabled ? "ENABLED" : "DISABLED");
-      } else {
-        // Path doesn't exist yet — write the compile-time default so PWA can see it
-        Firebase.setBool(fbdo, path, zones[i].sensorEnabled);
-        Serial.printf("[Config] Boot: zone %s sensor default written (%s)\n",
-          zones[i].id, zones[i].sensorEnabled ? "enabled" : "disabled");
       }
     }
 
@@ -874,9 +881,11 @@ void checkStreams() {
   String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
   String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
 
-  bool z1ok = Firebase.readStream(streamZ1) && !streamZ1.streamTimeout();
-  bool z2ok = Firebase.readStream(streamZ2) && !streamZ2.streamTimeout();
-  Serial.printf("[Stream] Z1=%s Z2=%s\n", z1ok ? "OK" : "DROPPED", z2ok ? "OK" : "DROPPED");
+  bool z1ok  = Firebase.readStream(streamZ1)     && !streamZ1.streamTimeout();
+  bool z2ok  = Firebase.readStream(streamZ2)     && !streamZ2.streamTimeout();
+  bool cfgok = Firebase.readStream(streamConfig) && !streamConfig.streamTimeout();
+  Serial.printf("[Stream] Z1=%s Z2=%s Config=%s\n",
+    z1ok ? "OK" : "DROPPED", z2ok ? "OK" : "DROPPED", cfgok ? "OK" : "DROPPED");
 
   if (!z1ok) {
     Serial.println("[Stream] Restarting Z1");
@@ -889,6 +898,20 @@ void checkStreams() {
     Firebase.beginStream(streamZ2, cmdPath2);
     Firebase.setStreamCallback(streamZ2, streamCallbackZ2, streamTimeoutCallback);
     pollCommand(1);
+  }
+  if (!cfgok) {
+    Serial.println("[Stream] Restarting Config stream — re-reading config from Firebase");
+    // Re-read current config values since we may have missed changes while dropped
+    if (Firebase.getInt(fbdo, configPath() + "/sensorIntervalMs")) {
+      int val = fbdo.intData();
+      if (val >= 10000 && val <= 300000) applyConfigSensorInterval(val);
+    }
+    for (int i = 0; i < 2; i++) {
+      String path = configPath() + "/sensorEnabled/" + zones[i].id;
+      if (Firebase.getBool(fbdo, path)) applyConfigSensorEnabled(zones[i].id, fbdo.boolData());
+    }
+    Firebase.beginStream(streamConfig, configPath());
+    Firebase.setStreamCallback(streamConfig, configStreamCallback, streamTimeoutCallback);
   }
 }
 
@@ -958,6 +981,33 @@ void loop() {
       pollCount, millis() / 1000, Firebase.ready() ? "YES" : "NO");
     pollCommand(0);
     pollCommand(1);
+  }
+
+  // Config poll every 10 seconds — reliable fallback for config changes
+  static uint32_t lastConfigPollMs = 0;
+  if (millis() - lastConfigPollMs >= 10000UL) {
+    lastConfigPollMs = millis();
+    Serial.printf("[Config poll] Running — runtimeSensorIntervalMs=%lu\n", runtimeSensorIntervalMs);
+    if (Firebase.ready()) {
+      // Use getString — more tolerant than getInt for mixed numeric types from Firebase
+      if (Firebase.getString(fbdo, configPath() + "/sensorIntervalMs")) {
+        int val = fbdo.stringData().toInt();
+        Serial.printf("[Config poll] sensorIntervalMs from Firebase: %d\n", val);
+        if (val >= 10000 && val <= 300000) applyConfigSensorInterval(val);
+      } else {
+        Serial.printf("[Config poll] sensorIntervalMs read failed: %s\n", fbdo.errorReason().c_str());
+      }
+      for (int i = 0; i < 2; i++) {
+        String path = configPath() + "/sensorEnabled/" + zones[i].id;
+        if (Firebase.getBool(fbdo, path)) {
+          applyConfigSensorEnabled(zones[i].id, fbdo.boolData());
+        } else {
+          Serial.printf("[Config poll] sensorEnabled/%s read failed: %s\n", zones[i].id, fbdo.errorReason().c_str());
+        }
+      }
+    } else {
+      Serial.println("[Config poll] Skipped — Firebase not ready");
+    }
   }
 
   // Firebase watchdog

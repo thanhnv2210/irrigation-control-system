@@ -146,13 +146,14 @@ function DeviceCard({ deviceId }) {
   const device      = useDeviceData(deviceId)
   const deviceZones = zones.filter(z => z.deviceId === deviceId)
 
-  const [open,          setOpen]          = useState(false)
-  const [configMs,      setConfigMs]      = useState(null)
-  const [sensorEnabled, setSensorEnabled] = useState({})
-  const [saving,        setSaving]        = useState(false)
-  const [renamingCtrl,  setRenamingCtrl]  = useState(false)
-  const [renamingZone,  setRenamingZone]  = useState(null)
-  const [editName,      setEditName]      = useState('')
+  const [open,            setOpen]            = useState(false)
+  const [configMs,        setConfigMs]        = useState(null)
+  const [sensorEnabled,   setSensorEnabled]   = useState({})
+  const [saving,          setSaving]          = useState(false)
+  const [renamingCtrl,    setRenamingCtrl]    = useState(false)
+  const [renamingZone,    setRenamingZone]    = useState(null)
+  const [editName,        setEditName]        = useState('')
+  const [pendingInterval, setPendingInterval] = useState(null)  // preset awaiting confirm
 
   useEffect(() => {
     if (!deviceId) return
@@ -244,18 +245,25 @@ function DeviceCard({ deviceId }) {
             <span style={styles.cfgMuted}>
               {fmt(configMs)}
               {reportedIntervalMs && reportedIntervalMs !== configMs &&
-                <span style={{ color: '#e0b03a' }}> · device {fmt(reportedIntervalMs)}</span>
+                <span style={{ color: '#e0b03a' }}> · device reporting {fmt(reportedIntervalMs)} — will update within 60s</span>
               }
             </span>
           )}
           <div style={styles.presetRow}>
             {INTERVAL_PRESETS.map(p => (
               <button key={p.ms} disabled={saving}
-                style={{ ...styles.presetBtn, ...(configMs === p.ms ? styles.presetActive : {}) }}
-                onClick={() => applyInterval(p.ms)}
+                style={{ ...styles.presetBtn, ...(configMs === p.ms ? styles.presetActive : {}), ...(pendingInterval?.ms === p.ms ? styles.presetPending : {}) }}
+                onClick={() => configMs !== p.ms && setPendingInterval(p)}
               >{p.label}</button>
             ))}
           </div>
+          {pendingInterval && (
+            <div style={styles.confirmTooltip}>
+              <span style={styles.confirmText}>Set interval to <strong>{pendingInterval.label}</strong>?</span>
+              <button style={styles.confirmYes} onClick={() => { applyInterval(pendingInterval.ms); setPendingInterval(null) }}>Apply</button>
+              <button style={styles.confirmNo}  onClick={() => setPendingInterval(null)}>Cancel</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -377,7 +385,12 @@ const styles = {
   presetRow:     { display: 'flex', gap: '0.3rem', marginLeft: 'auto' },
   presetBtn:     { padding: '0.3rem 0.65rem', borderRadius: '6px', border: '1px solid #3a5a45', background: 'transparent', color: '#7aab90', fontSize: '0.78rem', cursor: 'pointer' },
   presetActive:  { background: '#1a7f4b', color: '#fff', borderColor: '#1a7f4b' },
+  presetPending: { background: '#2e4a38', color: '#e0f0e8', borderColor: '#e0b03a' },
   presetDanger:  { background: '#e05c3a', color: '#fff', borderColor: '#e05c3a' },
+  confirmTooltip:{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', background: '#162a1e', border: '1px solid #e0b03a', borderRadius: '8px', padding: '0.5rem 0.75rem', flexWrap: 'wrap' },
+  confirmText:   { color: '#e0f0e8', fontSize: '0.82rem', flex: 1 },
+  confirmYes:    { background: '#1a7f4b', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.82rem', fontWeight: 600, padding: '0.35rem 0.75rem', cursor: 'pointer' },
+  confirmNo:     { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.82rem', padding: '0.35rem 0.75rem', cursor: 'pointer' },
 
   // Shared inline rename
   iconBtn:       { background: 'transparent', border: '1px solid #3a5a45', borderRadius: '6px', color: '#7aab90', fontSize: '0.85rem', padding: '0.4rem 0.6rem', cursor: 'pointer', flexShrink: 0 },
