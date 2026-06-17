@@ -864,12 +864,11 @@ static uint32_t lastStreamCheckMs = 0;
 void pollCommand(int zoneIdx) {
   // Note: sensorEnabled only disables sensor reads — valve commands are always polled
   String cmdPath = zonePath(zones[zoneIdx].id) + "/command/action";
-  Serial.printf("[Cmd] Polling %s → %s\n", zones[zoneIdx].id, cmdPath.c_str());
   if (Firebase.getString(fbdo, cmdPath)) {
     String action = fbdo.stringData();
     action.trim();
-    Serial.printf("[Cmd] Poll result for %s: \"%s\"\n", zones[zoneIdx].id, action.c_str());
     if (action.length() > 0 && action != "null") {
+      Serial.printf("[Cmd] Command received for %s: \"%s\"\n", zones[zoneIdx].id, action.c_str());
       handleCommand(zoneIdx, action);
     }
   } else {
@@ -884,8 +883,10 @@ void checkStreams() {
   bool z1ok  = Firebase.readStream(streamZ1)     && !streamZ1.streamTimeout();
   bool z2ok  = Firebase.readStream(streamZ2)     && !streamZ2.streamTimeout();
   bool cfgok = Firebase.readStream(streamConfig) && !streamConfig.streamTimeout();
-  Serial.printf("[Stream] Z1=%s Z2=%s Config=%s\n",
-    z1ok ? "OK" : "DROPPED", z2ok ? "OK" : "DROPPED", cfgok ? "OK" : "DROPPED");
+  if (!z1ok || !z2ok || !cfgok) {
+    Serial.printf("[Stream] Z1=%s Z2=%s Config=%s\n",
+      z1ok ? "OK" : "DROPPED", z2ok ? "OK" : "DROPPED", cfgok ? "OK" : "DROPPED");
+  }
 
   if (!z1ok) {
     Serial.println("[Stream] Restarting Z1");
@@ -977,8 +978,6 @@ void loop() {
   if (millis() - lastCmdPollMs >= 3000UL) {
     lastCmdPollMs = millis();
     pollCount++;
-    Serial.printf("[Cmd] --- Poll #%lu | uptime %lus | Firebase.ready=%s ---\n",
-      pollCount, millis() / 1000, Firebase.ready() ? "YES" : "NO");
     pollCommand(0);
     pollCommand(1);
   }
@@ -987,12 +986,9 @@ void loop() {
   static uint32_t lastConfigPollMs = 0;
   if (millis() - lastConfigPollMs >= 10000UL) {
     lastConfigPollMs = millis();
-    Serial.printf("[Config poll] Running — runtimeSensorIntervalMs=%lu\n", runtimeSensorIntervalMs);
     if (Firebase.ready()) {
-      // Use getString — more tolerant than getInt for mixed numeric types from Firebase
       if (Firebase.getString(fbdo, configPath() + "/sensorIntervalMs")) {
         int val = fbdo.stringData().toInt();
-        Serial.printf("[Config poll] sensorIntervalMs from Firebase: %d\n", val);
         if (val >= 10000 && val <= 300000) applyConfigSensorInterval(val);
       } else {
         Serial.printf("[Config poll] sensorIntervalMs read failed: %s\n", fbdo.errorReason().c_str());
@@ -1005,8 +1001,6 @@ void loop() {
           Serial.printf("[Config poll] sensorEnabled/%s read failed: %s\n", zones[i].id, fbdo.errorReason().c_str());
         }
       }
-    } else {
-      Serial.println("[Config poll] Skipped — Firebase not ready");
     }
   }
 
