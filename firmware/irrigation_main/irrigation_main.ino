@@ -128,16 +128,22 @@ static uint32_t offlineStartMs   = 0;  // millis() when connectivity was lost
 static uint32_t runtimeSensorIntervalMs = SENSOR_INTERVAL_MS;
 
 // ---------------------------------------------------------------------------
-// Path helper — all data lives under irrigation/sites/{SITE_ID}/
+// Pre-computed Firebase paths — built once in setup(), never reallocated.
+// Eliminates the 5-part String concatenation that zonePath() previously did
+// on every Firebase call (every 3–30s), which was the main source of heap
+// fragmentation on the hot path.
 // ---------------------------------------------------------------------------
-static String zonePath(const char* zoneId) {
-  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/zones/" + zoneId;
-}
-static String devicePath() {
-  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/meta";
-}
-static String configPath() {
-  return String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/config";
+static String G_ZONE_BASE[2];   // base path per zone
+static String G_DEV_PATH;       // .../devices/{id}/meta
+static String G_CFG_PATH;       // .../devices/{id}/config
+
+static const String& zonePath(int zoneIdx)        { return G_ZONE_BASE[zoneIdx]; }
+static const String& devicePath()                 { return G_DEV_PATH; }
+static const String& configPath()                 { return G_CFG_PATH; }
+
+// Overload for call sites that pass a zone id string (e.g., handleCommand)
+static const String& zonePathById(const char* zoneId) {
+  return (strcmp(zoneId, zones[0].id) == 0) ? G_ZONE_BASE[0] : G_ZONE_BASE[1];
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +209,7 @@ void openValve(int zoneIdx, const char* openedBy) {
   z.valveOpenedAt = millis();
   Serial.printf("[Zone %s] Relay pin %d set LOW (open)\n", z.id, z.relayPin);
 
-  String base = zonePath(z.id);
+  const String& base = zonePath(zoneIdx);
   bool ok1 = Firebase.setString(fbdo, base + "/valve/state",         "OPEN");
   bool ok2 = Firebase.setString(fbdo, base + "/valve/openedBy",      openedBy);
   bool ok3 = Firebase.setTimestamp(fbdo, base + "/valve/lastChangedAt");
@@ -223,7 +229,7 @@ void closeValve(int zoneIdx) {
     // Force relay and Firebase to CLOSED even if internal state disagrees — safety net
     Serial.printf("[Zone %s] Internal state says CLOSED but forcing relay+Firebase sync\n", z.id);
     digitalWrite(z.relayPin, HIGH);
-    String base = zonePath(z.id);
+    const String& base = zonePath(zoneIdx);
     bool ok = Firebase.setString(fbdo, base + "/valve/state", "CLOSED");
     Serial.printf("[Zone %s] Firebase sync result: %s\n", z.id, ok ? "ok" : fbdo.errorReason().c_str());
     return;
@@ -232,7 +238,7 @@ void closeValve(int zoneIdx) {
   digitalWrite(z.relayPin, HIGH);  // Active-LOW relay — HIGH = off
   z.valveOpen = false;
 
-  String base = zonePath(z.id);
+  const String& base = zonePath(zoneIdx);
   bool ok = Firebase.setString(fbdo, base + "/valve/state", "CLOSED");
   Firebase.setTimestamp(fbdo, base + "/valve/lastChangedAt");
   Serial.printf("[Zone %s] Valve CLOSED — Firebase write: %s\n", z.id, ok ? "ok" : fbdo.errorReason().c_str());
@@ -267,10 +273,17 @@ void enforceValveSafety() {
 // Schedule loading — reads all schedules from Firebase for both zones
 // ---------------------------------------------------------------------------
 void loadSchedules() {
+  // Declared outside the inner loop — avoids repeated heap alloc/free per schedule entry.
+  // setJsonData() replaces content in-place without deallocating the internal buffer.
+  FirebaseJson     entry;
+  FirebaseJson     daysJson;
+  FirebaseJsonData field;
+  FirebaseJsonData dayVal;
+
   for (int zi = 0; zi < 2; zi++) {
     scheduleCount[zi] = 0;
     const char* zoneId = zones[zi].id;
-    String path = zonePath(zoneId) + "/schedule";
+    String path = zonePath(zi) + "/schedule";
 
     if (!Firebase.getJSON(fbdo, path)) {
       Serial.printf("[Schedule] Load failed for %s: %s\n", zoneId, fbdo.errorReason().c_str());
@@ -278,7 +291,6 @@ void loadSchedules() {
     }
 
     FirebaseJson& json = fbdo.jsonObject();
-    FirebaseJsonData result;
     size_t count = json.iteratorBegin();
     int idx = 0;
 
@@ -287,10 +299,7 @@ void loadSchedules() {
       int type;
       json.iteratorGet(i, type, key, value);
 
-      // Each key is a schedule ID — get the nested object
-      FirebaseJson entry;
       entry.setJsonData(value);
-      FirebaseJsonData field;
 
       ScheduleEntry& s = schedules[zi][idx];
       s.valid = true;
@@ -304,9 +313,7 @@ void loadSchedules() {
       for (int d = 0; d < 7; d++) s.days[d] = false;
       entry.get(field, "days");
       if (field.success) {
-        FirebaseJson daysJson;
         daysJson.setJsonData(field.stringValue);
-        FirebaseJsonData dayVal;
         for (int d = 0; d < 7; d++) {
           daysJson.get(dayVal, String("[") + d + "]");
           if (dayVal.success) {
@@ -368,6 +375,10 @@ void checkSchedules() {
 // Sensors
 // ---------------------------------------------------------------------------
 void readAndPublishSensors() {
+  // Static — allocated once, never freed. clear() resets content without freeing the buffer.
+  static FirebaseJson sensorJson;
+  static FirebaseJson histJson;
+
   for (int i = 0; i < 2; i++) {
     Zone& z = zones[i];
     if (!z.sensorEnabled) {
@@ -377,10 +388,10 @@ void readAndPublishSensors() {
     int raw = analogRead(z.sensorPin);
     int pct = constrain(map(raw, z.dryRaw, z.wetRaw, 0, 100), 0, 100);
 
-    String base = zonePath(z.id);
+    const String& base = zonePath(i);
 
     // Overwrite current sensor reading
-    FirebaseJson sensorJson;
+    sensorJson.clear();
     sensorJson.set("moisturePercent", pct);
     sensorJson.set("rawValue",        raw);
     sensorJson.set("timestamp/.sv",   "timestamp");
@@ -398,7 +409,7 @@ void readAndPublishSensors() {
     static int historyCallCount = 0;
     if (i == 0) historyCallCount++;  // increment once per readAndPublishSensors() call
     if (historyCallCount % 4 == 0) {
-      FirebaseJson histJson;
+      histJson.clear();
       histJson.set("moisturePercent", pct);
       histJson.set("rawValue",        raw);
       histJson.set("timestamp/.sv",   "timestamp");
@@ -415,7 +426,8 @@ void readAndPublishSensors() {
 // Device heartbeat
 // ---------------------------------------------------------------------------
 void publishHeartbeat() {
-  FirebaseJson json;
+  static FirebaseJson json;
+  json.clear();
   json.set("firmware",          FIRMWARE_VERSION);
   json.set("lastSeen/.sv",      "timestamp");
   json.set("ipAddress",         WiFi.localIP().toString());
@@ -435,7 +447,7 @@ void publishHeartbeat() {
 // Command handler (called from stream callbacks)
 // ---------------------------------------------------------------------------
 void handleCommand(int zoneIdx, const String& action) {
-  String cmdBase  = zonePath(zones[zoneIdx].id) + "/command";
+  String cmdBase  = zonePath(zoneIdx) + "/command";
 
   Serial.printf("[Cmd] handleCommand zone=%s action=%s\n", zones[zoneIdx].id, action.c_str());
 
@@ -541,6 +553,13 @@ void checkFirebaseWatchdog() {
 // setup()
 // ---------------------------------------------------------------------------
 void setup() {
+  // Build Firebase paths once — all inputs are compile-time constants.
+  // Doing this here (not at global-variable init time) avoids static-init ordering issues.
+  G_ZONE_BASE[0] = String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/zones/" + zones[0].id;
+  G_ZONE_BASE[1] = String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/zones/" + zones[1].id;
+  G_DEV_PATH     = String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/meta";
+  G_CFG_PATH     = String("irrigation/sites/") + SITE_ID + "/devices/" + DEVICE_ID + "/config";
+
   Serial.begin(115200);
   Serial.println("\n[Boot] Irrigation controller starting...");
 
@@ -654,10 +673,10 @@ void setup() {
   fbConfig.token_status_callback = tokenStatusCallback;
 
   Firebase.reconnectNetwork(true);
-  fbdo.setBSSLBufferSize(4096, 1024);
-  streamZ1.setBSSLBufferSize(4096, 1024);
-  streamZ2.setBSSLBufferSize(4096, 1024);
-  streamConfig.setBSSLBufferSize(4096, 1024);
+  fbdo.setBSSLBufferSize(4096, 1024);      // full size — handles large JSON reads (schedules, heartbeat)
+  streamZ1.setBSSLBufferSize(2048, 512);   // streams only receive short strings ("OPEN"/"CLOSE"/"null")
+  streamZ2.setBSSLBufferSize(2048, 512);
+  streamConfig.setBSSLBufferSize(2048, 512); // config values are small scalars
 
   Firebase.begin(&fbConfig, &fbAuth);
 
@@ -704,8 +723,8 @@ void setup() {
     }
 
     // Start command streams
-    String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
-    String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
+    String cmdPath1 = zonePath(0) + "/command/action";
+    String cmdPath2 = zonePath(1) + "/command/action";
 
     if (!Firebase.beginStream(streamZ1, cmdPath1)) {
       Serial.printf("[Firebase] Stream Z1 failed: %s\n", streamZ1.errorReason().c_str());
@@ -730,7 +749,7 @@ void setup() {
 
     // Register zone meta only if it does not exist yet — never overwrite a name set via PWA
     for (int i = 0; i < 2; i++) {
-      String metaPath = zonePath(zones[i].id) + "/meta";
+      String metaPath = zonePath(i) + "/meta";
       bool exists = Firebase.getString(fbdo, metaPath + "/name") && fbdo.stringData().length() > 0;
       if (!exists) {
         Firebase.setString(fbdo, metaPath + "/name",    zones[i].name);
@@ -747,8 +766,8 @@ void setup() {
       zones[i].valveOpen   = false;
       scheduleCloseAt[i]   = 0;
 
-      String statePath = zonePath(zones[i].id) + "/valve/state";
-      String cmdPath   = zonePath(zones[i].id) + "/command/action";
+      String statePath = zonePath(i) + "/valve/state";
+      String cmdPath   = zonePath(i) + "/command/action";
 
       bool wasOpen = false;
       if (Firebase.getString(fbdo, statePath)) {
@@ -928,7 +947,7 @@ static uint32_t lastStreamCheckMs = 0;
 
 void pollCommand(int zoneIdx) {
   // Note: sensorEnabled only disables sensor reads — valve commands are always polled
-  String cmdPath = zonePath(zones[zoneIdx].id) + "/command/action";
+  String cmdPath = zonePath(zoneIdx) + "/command/action";
   if (Firebase.getString(fbdo, cmdPath)) {
     String action = fbdo.stringData();
     action.trim();
@@ -942,8 +961,8 @@ void pollCommand(int zoneIdx) {
 }
 
 void checkStreams() {
-  String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
-  String cmdPath2 = zonePath(ZONE_2_ID) + "/command/action";
+  String cmdPath1 = zonePath(0) + "/command/action";
+  String cmdPath2 = zonePath(1) + "/command/action";
 
   bool z1ok  = Firebase.readStream(streamZ1)     && !streamZ1.streamTimeout();
   bool z2ok  = Firebase.readStream(streamZ2)     && !streamZ2.streamTimeout();
