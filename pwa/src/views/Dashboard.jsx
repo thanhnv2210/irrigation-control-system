@@ -105,6 +105,11 @@ function DeviceStatus({ deviceId }) {
             {fmtMs(device.maxValveMs)       && <span>Valve max: {fmtMs(device.maxValveMs)}</span>}
             {device.ipAddress && <span>IP: {device.ipAddress}</span>}
             {device.wifiRssi  && <span>RSSI: {device.wifiRssi} dBm</span>}
+            {device.freeHeap != null && (
+              <span style={{ color: device.freeHeap < 30000 ? '#e05c3a' : '#7aab90' }}>
+                Free heap: {Math.round(device.freeHeap / 1024)} KB{device.freeHeap < 30000 ? ' (low — may crash soon)' : ''}
+              </span>
+            )}
             {diagText && <span style={{ color: '#e0b03a' }}>{diagText}</span>}
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, createElement } from 'react'
-import { ref, onValue } from 'firebase/database'
+import { ref, onValue, get, set } from 'firebase/database'
 import { db } from '../firebase'
 import { useZoneData, useDeviceData } from './useZoneData'
 import { useSite } from '../context/SiteContext'
@@ -18,11 +18,24 @@ export async function sendTelegram(token, chatId, text) {
   } catch { return false }
 }
 
-function getLastAlert(key) { return parseInt(localStorage.getItem(`irrigAlert_${key}`) || '0') }
-function setLastAlert(key) { localStorage.setItem(`irrigAlert_${key}`, Date.now().toString()) }
-function clearLastAlert(key) { localStorage.removeItem(`irrigAlert_${key}`) }
+// Cooldown stored in Firebase so all open tabs/environments share the same state.
+// Path: irrigation/sites/{siteId}/alertCooldowns/{key}
+async function getLastAlert(path) {
+  try {
+    const snap = await get(ref(db, path))
+    return snap.val() ?? 0
+  } catch { return 0 }
+}
 
-function ZoneAlertMonitor({ zone, settings, siteId }) {
+async function setLastAlert(path) {
+  try { await set(ref(db, path), Date.now()) } catch {}
+}
+
+async function clearLastAlert(path) {
+  try { await set(ref(db, path), null) } catch {}
+}
+
+function ZoneAlertMonitor({ zone, settings, siteId, alertBasePath }) {
   const { sensor } = useZoneData({ zoneId: zone.id, deviceId: zone.deviceId })
   const moisture = sensor?.moisturePercent
   const prevAbove = useRef(true)
@@ -32,22 +45,27 @@ function ZoneAlertMonitor({ zone, settings, siteId }) {
   }, [siteId])
 
   useEffect(() => {
-    const cfg = settings
-    if (!cfg?.telegram?.token || !cfg?.telegram?.chatId || moisture == null) return
-    const zoneCfg   = cfg.zones?.[zone.id] ?? {}
-    const enabled   = zoneCfg.enabled !== false
-    const threshold = zoneCfg.threshold ?? 30
-    const isLow     = moisture < threshold
-    const wasAbove  = prevAbove.current
-    if (enabled && isLow && wasAbove) {
-      if (Date.now() - getLastAlert(`${siteId}_${zone.id}`) > COOLDOWN_MS) {
-        sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
-          `⚠️ <b>Low Moisture Alert</b>\n\nZone: <b>${zone.label}</b>\nMoisture: <b>${moisture}%</b> (threshold: ${threshold}%)\nTime: ${new Date().toLocaleString()}\n\n💧 Consider checking the irrigation schedule.`)
-        setLastAlert(`${siteId}_${zone.id}`)
+    async function check() {
+      const cfg = settings
+      if (!cfg?.telegram?.token || !cfg?.telegram?.chatId || moisture == null) return
+      const zoneCfg   = cfg.zones?.[zone.id] ?? {}
+      const enabled   = zoneCfg.enabled !== false
+      const threshold = zoneCfg.threshold ?? 30
+      const isLow     = moisture < threshold
+      const wasAbove  = prevAbove.current
+      if (enabled && isLow && wasAbove) {
+        const alertPath = `${alertBasePath}/zone_${zone.id}`
+        const lastSent  = await getLastAlert(alertPath)
+        if (Date.now() - lastSent > COOLDOWN_MS) {
+          sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
+            `⚠️ <b>Low Moisture Alert</b>\n\nZone: <b>${zone.label}</b>\nMoisture: <b>${moisture}%</b> (threshold: ${threshold}%)\nTime: ${new Date().toLocaleString()}\n\n💧 Consider checking the irrigation schedule.`)
+          setLastAlert(alertPath)
+        }
       }
+      prevAbove.current = !isLow
     }
-    prevAbove.current = !isLow
-  }, [moisture, settings, siteId, zone.id, zone.label])
+    check()
+  }, [moisture, settings, siteId, zone.id, zone.label, alertBasePath])
 
   return null
 }
@@ -55,13 +73,14 @@ function ZoneAlertMonitor({ zone, settings, siteId }) {
 export function useAlertMonitor() {
   const { sitePath, siteId, zones, devices } = useSite()
   const [settings, setSettings] = useState(null)
-  const device  = useDeviceData(devices[0]?.id ?? 'esp32-01')
-  const deviceName = device?.name || devices[0]?.id || 'esp32-01'
+  const device      = useDeviceData(devices[0]?.id ?? 'esp32-01')
+  const deviceName  = device?.name || devices[0]?.id || 'esp32-01'
 
-  const settingsRef     = useRef(null)
-  const lastSeenRef     = useRef(null)
-  const diagRef         = useRef(null)
-  const deviceWasOnline = useRef(null)
+  const settingsRef      = useRef(null)
+  const lastSeenRef      = useRef(null)
+  const diagRef          = useRef(null)
+  const deviceWasOnline  = useRef(null)
+  const offlineStreakRef = useRef(0)
 
   useEffect(() => { settingsRef.current = settings }, [settings])
   useEffect(() => { lastSeenRef.current = device?.lastSeen }, [device?.lastSeen])
@@ -77,13 +96,13 @@ export function useAlertMonitor() {
   // Reset state when switching sites
   useEffect(() => {
     deviceWasOnline.current = null
+    offlineStreakRef.current = 0
   }, [siteId])
 
   useEffect(() => {
-    // Require 2 consecutive offline checks before alerting — prevents SSL blip false alarms
-    let offlineStreak = 0
+    const alertBasePath = sitePath('alertCooldowns')
 
-    function checkDevice() {
+    async function checkDevice() {
       const cfg      = settingsRef.current
       const lastSeen = lastSeenRef.current
       if (!cfg?.telegram?.token || !cfg?.telegram?.chatId || !lastSeen) return
@@ -94,36 +113,40 @@ export function useAlertMonitor() {
 
       if (wasOnline === null) {
         deviceWasOnline.current = isOnline
-        offlineStreak = isOnline ? 0 : 1
+        offlineStreakRef.current = isOnline ? 0 : 1
         return
       }
 
       if (!isOnline) {
-        offlineStreak++
+        offlineStreakRef.current++
       } else {
-        offlineStreak = 0
+        offlineStreakRef.current = 0
       }
 
       // Only alert offline after 2 consecutive misses (reduces SSL blip false alarms)
-      if (!isOnline && wasOnline && offlineStreak >= 2) {
-        if (Date.now() - getLastAlert(`${siteId}_device`) > COOLDOWN_MS) {
+      if (!isOnline && wasOnline && offlineStreakRef.current >= 2) {
+        const alertPath = `${alertBasePath}/device_offline`
+        const lastSent  = await getLastAlert(alertPath)
+        if (Date.now() - lastSent > COOLDOWN_MS) {
           const mins = Math.round((Date.now() - lastSeen) / 60000)
           sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
             `🔴 <b>Device Offline</b>\n\n<b>${deviceName}</b> has not reported in <b>${mins} min</b>.\nTime: ${new Date().toLocaleString()}\n\nCheck WiFi connection or power supply.`)
-          setLastAlert(`${siteId}_device`)
+          setLastAlert(alertPath)
         }
       } else if (isOnline && wasOnline === false) {
-        // Cooldown on recovery too — prevents online/offline spam pairs
-        if (Date.now() - getLastAlert(`${siteId}_device_online`) > COOLDOWN_MS) {
+        const onlinePath  = `${alertBasePath}/device_online`
+        const offlinePath = `${alertBasePath}/device_offline`
+        const lastSent    = await getLastAlert(onlinePath)
+        if (Date.now() - lastSent > COOLDOWN_MS) {
           const diag = diagRef.current
           const diagLine = diag
             ? `\n\n📋 <b>Disconnect reason:</b> ${diag.reason?.replace('_', ' ')}\n⏱ Offline: ${diag.offlineSec}s\n📶 RSSI: ${diag.wifiRssi} dBm\n🧠 Free heap: ${diag.freeHeap} bytes`
             : ''
           sendTelegram(cfg.telegram.token, cfg.telegram.chatId,
             `🟢 <b>Device Back Online</b>\n\n<b>${deviceName}</b> reconnected successfully.\nTime: ${new Date().toLocaleString()}${diagLine}`)
-          setLastAlert(`${siteId}_device_online`)
+          setLastAlert(onlinePath)
         }
-        clearLastAlert(`${siteId}_device`)
+        clearLastAlert(offlinePath)
       }
       deviceWasOnline.current = isOnline
     }
@@ -132,8 +155,8 @@ export function useAlertMonitor() {
     return () => clearInterval(timer)
   }, [siteId])
 
-  // Return zone monitors — caller renders these to trigger per-zone alerts
+  const alertBasePath = sitePath('alertCooldowns')
   return zones.map(zone =>
-    createElement(ZoneAlertMonitor, { key: zone.id, zone, settings, siteId })
+    createElement(ZoneAlertMonitor, { key: zone.id, zone, settings, siteId, alertBasePath })
   )
 }

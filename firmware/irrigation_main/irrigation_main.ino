@@ -393,15 +393,20 @@ void readAndPublishSensors() {
       continue;
     }
 
-    // Push to history for statistics (one entry per reading)
-    FirebaseJson histJson;
-    histJson.set("moisturePercent", pct);
-    histJson.set("rawValue",        raw);
-    histJson.set("timestamp/.sv",   "timestamp");
-    histJson.set("valveOpen",       z.valveOpen);
+    // Push to history every 4th sensor read (every ~2 min at 30s interval)
+    // Reduces heap pressure and Firebase write cost from continuous pushJSON calls
+    static int historyCallCount = 0;
+    if (i == 0) historyCallCount++;  // increment once per readAndPublishSensors() call
+    if (historyCallCount % 4 == 0) {
+      FirebaseJson histJson;
+      histJson.set("moisturePercent", pct);
+      histJson.set("rawValue",        raw);
+      histJson.set("timestamp/.sv",   "timestamp");
+      histJson.set("valveOpen",       z.valveOpen);
 
-    if (!Firebase.pushJSON(fbdo, base + "/history", histJson)) {
-      Serial.printf("[Zone %s] History push failed: %s\n", z.id, fbdo.errorReason().c_str());
+      if (!Firebase.pushJSON(fbdo, base + "/history", histJson)) {
+        Serial.printf("[Zone %s] History push failed: %s\n", z.id, fbdo.errorReason().c_str());
+      }
     }
   }
 }
@@ -418,6 +423,8 @@ void publishHeartbeat() {
   json.set("sensorIntervalMs",   (int)runtimeSensorIntervalMs);
   json.set("heartbeatIntervalMs",(int)HEARTBEAT_INTERVAL_MS);
   json.set("maxValveMs",         (int)MAX_VALVE_MS);
+
+  json.set("freeHeap", (int)ESP.getFreeHeap());
 
   if (Firebase.updateNode(fbdo, devicePath(), json)) {
     lastFirebaseOkMs = millis();
@@ -518,9 +525,14 @@ void streamTimeoutCallback(bool timeout) {
 void checkFirebaseWatchdog() {
   if (millis() - lastFirebaseOkMs > FIREBASE_TIMEOUT_MS) {
     Serial.println("[Watchdog] Firebase unreachable too long — rebooting");
-    offlineStartMs = lastFirebaseOkMs;  // offline since last successful Firebase call
-    publishDiagnostic("watchdog_reboot");
-    delay(1000);
+    // Save diagnostic to flash — publishDiagnostic() would fail here since Firebase is unreachable.
+    // The pending entry is read and published in setup() after the next successful reconnect.
+    preferences.begin("diag", false);
+    preferences.putString("pendingReason",     "watchdog_reboot");
+    preferences.putInt   ("pendingHeap",       (int)ESP.getFreeHeap());
+    preferences.putLong  ("pendingOfflineSec", (long)((millis() - lastFirebaseOkMs) / 1000));
+    preferences.end();
+    delay(500);
     ESP.restart();
   }
 }
@@ -651,6 +663,38 @@ void setup() {
 
   if (Firebase.ready()) {
     lastFirebaseOkMs = millis();
+
+    // Publish any deferred diagnostic saved by the watchdog before its last reboot.
+    // The write was skipped then because Firebase was unreachable — now it can succeed.
+    {
+      preferences.begin("diag", true);
+      String pendingReason    = preferences.getString("pendingReason",     "");
+      int    pendingHeap      = preferences.getInt   ("pendingHeap",       0);
+      long   pendingOfflineSec= preferences.getLong  ("pendingOfflineSec", 0);
+      preferences.end();
+
+      if (pendingReason.length() > 0) {
+        FirebaseJson diagJson;
+        diagJson.set("reason",         pendingReason);
+        diagJson.set("freeHeap",       pendingHeap);
+        diagJson.set("offlineSec",     (int)pendingOfflineSec);
+        diagJson.set("uptimeSec",      (int)(millis() / 1000));
+        diagJson.set("wifiRssi",       WiFi.RSSI());
+        diagJson.set("ipAddress",      WiFi.localIP().toString());
+        diagJson.set("timestamp/.sv",  "timestamp");
+        if (Firebase.updateNode(fbdo, String(devicePath()) + "/lastDiagnostic", diagJson)) {
+          Serial.printf("[Diag] Deferred diagnostic published — reason: %s, offline: %lds\n",
+            pendingReason.c_str(), pendingOfflineSec);
+          preferences.begin("diag", false);
+          preferences.remove("pendingReason");
+          preferences.remove("pendingHeap");
+          preferences.remove("pendingOfflineSec");
+          preferences.end();
+        } else {
+          Serial.printf("[Diag] Deferred diagnostic publish failed: %s\n", fbdo.errorReason().c_str());
+        }
+      }
+    }
 
     // Start command streams
     String cmdPath1 = zonePath(ZONE_1_ID) + "/command/action";
