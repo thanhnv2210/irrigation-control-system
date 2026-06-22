@@ -896,6 +896,32 @@ void checkWifi() {
   }
 }
 
+// Scheduled daily reboot — clears heap fragmentation and resets Firebase/WiFi state
+// Runs at 03:00 local time. Skipped if any valve is open (safety).
+// Saves a diagnostic to flash so the Dashboard shows "scheduled_reboot" after recovery.
+// ---------------------------------------------------------------------------
+void checkDailyReboot() {
+  struct tm timeInfo;
+  if (!getLocalTime(&timeInfo)) return;
+  if (timeInfo.tm_hour != 3 || timeInfo.tm_min != 0) return;
+
+  for (int i = 0; i < 2; i++) {
+    if (zones[i].valveOpen) {
+      Serial.printf("[Reboot] Scheduled reboot skipped — zone %s valve is open\n", zones[i].id);
+      return;
+    }
+  }
+
+  Serial.println("[Reboot] Scheduled daily reboot at 03:00");
+  preferences.begin("diag", false);
+  preferences.putString("pendingReason",     "scheduled_reboot");
+  preferences.putInt   ("pendingHeap",       (int)ESP.getFreeHeap());
+  preferences.putLong  ("pendingOfflineSec", 0);
+  preferences.end();
+  delay(500);
+  ESP.restart();
+}
+
 // Stream health check — restart any stream that has dropped
 // ---------------------------------------------------------------------------
 static uint32_t lastStreamCheckMs = 0;
@@ -991,10 +1017,11 @@ void loop() {
     }
   }
 
-  // Check schedules every minute
+  // Check schedules + daily reboot every minute
   if (millis() - lastScheduleCheckMs >= 60000UL) {
     lastScheduleCheckMs = millis();
     checkSchedules();
+    checkDailyReboot();
   }
 
   // WiFi check every 30 seconds
