@@ -24,12 +24,13 @@
     // -----------------------------------------------------------------------
     "irrigation": {
       "sites": {
-        ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+        // No broad .read at this level — each site grants access explicitly per path.
+        // This prevents the parent cascade from accidentally granting anonymous read
+        // to sensitive paths like settings/ (which contains the Telegram bot token).
         "$site_id": {
-          ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
-          ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+          // No broad .read or .write at site level — controlled per child path below.
 
-          // Site metadata
+          // Site metadata — guests may read (site name, etc.)
           "meta": {
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
@@ -38,16 +39,14 @@
           // Devices — each device owns its meta heartbeat and zones
           "devices": {
             "$device_id": {
-              ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
-              ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-
-              // Device heartbeat — ESP32 or owner writes
+              // Device heartbeat — ESP32 or owner writes; guests may read
               "meta": {
-                ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                 ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
               },
 
-              // Device config — written by owners/PWA, read by device + owners
+              // Device config — written by owners/PWA only; device and owners may read
+              // Guests cannot read config (no operational need; reduces attack surface)
               "config": {
                 ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
                 ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
@@ -57,34 +56,43 @@
               "zones": {
                 "$zone_id": {
 
+                  // Zone display name + enabled flag — guests may read
+                  // Device UID included explicitly (also covered by parent meta grant above,
+                  // but declared here for clarity when auditing rules in isolation)
                   "meta": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
-                    ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
-                  },
-
-                  "sensor": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
+                  // Live sensor reading — device writes, guests may read
+                  "sensor": {
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                    ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+                  },
+
+                  // Historical sensor readings — guests may read
                   "history": {
                     ".indexOn": ["timestamp"],
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
+                  // Valve state — device writes after acting; guests may read
                   "valve": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
+                  // Command channel — owners write OPEN/CLOSE; device reads and clears to "null"
+                  // Guests cannot read or write (they cannot issue commands)
                   "command": {
                     ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
-                    ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2')"
+                    ".write": "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   },
 
+                  // Schedules — owners write; device reads; guests may read
                   "schedule": {
-                    ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+                    ".read":  "auth != null && (auth.uid === '2GVAabgRrafbeBkfpeagzYnnU9w2' || auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
                     ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
                   }
                 }
@@ -92,16 +100,25 @@
             }
           },
 
-          // Audit log — per site
+          // Audit log — per site; guests may read (transparent history)
           "auditLog": {
             ".indexOn": ["timestamp"],
             ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           },
 
-          // Settings (alerts, Telegram) — per site
+          // Settings (Telegram token, alert thresholds) — owners only
+          // MUST NOT be readable by guests — token would allow anyone to send Telegram messages
           "settings": {
-            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
+            ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
+          },
+
+          // Alert cooldowns — shared state so all open PWA tabs agree on last-sent time
+          // Cloud Function (Admin SDK) also writes here — Admin SDK bypasses rules
+          // Guests cannot read or write (no operational need)
+          "alertCooldowns": {
+            ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
             ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')"
           }
         }
