@@ -123,6 +123,8 @@ static uint32_t lastSensorMs    = 0;
 static uint32_t lastHeartbeatMs = 0;
 static uint32_t lastFirebaseOkMs = 0;  // tracks last successful Firebase call
 static uint32_t offlineStartMs   = 0;  // millis() when connectivity was lost
+static uint32_t lastWifiCheckMs  = 0;
+static bool     wifiWasConnected = false;
 
 // Runtime config — overridable from Firebase without reflashing
 static uint32_t runtimeSensorIntervalMs = SENSOR_INTERVAL_MS;
@@ -887,9 +889,6 @@ void publishDiagnostic(const char* reason) {
 
 // WiFi reconnect — monitors connection and reconnects if lost
 // ---------------------------------------------------------------------------
-static uint32_t lastWifiCheckMs   = 0;
-static bool     wifiWasConnected  = false;
-
 void checkWifi() {
   bool connected = WiFi.status() == WL_CONNECTED;
 
