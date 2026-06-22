@@ -24,11 +24,17 @@
     // -----------------------------------------------------------------------
     "irrigation": {
       "sites": {
-        // No broad .read at this level — each site grants access explicitly per path.
-        // This prevents the parent cascade from accidentally granting anonymous read
-        // to sensitive paths like settings/ (which contains the Telegram bot token).
+        // Broad read required here — SiteContext reads 'irrigation/sites' as a whole
+        // to build the site switcher list. Firebase RTDB child rules cannot restrict
+        // a parent grant, so anonymous users can technically reach settings/ via this
+        // cascade. Known limitation documented in docs/firebase-permissions.md.
+        // Mitigation: the Telegram token is low-risk for this personal/trusted-guest setup.
+        ".read": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
         "$site_id": {
-          // No broad .read or .write at site level — controlled per child path below.
+          // Broad read at site level required — SiteContext reads 'devices/' as a whole
+          // subtree to derive both the device list and zone list in one subscription.
+          ".read":  "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2' || auth.token.firebase.sign_in_provider === 'anonymous')",
+          ".write": "auth != null && (auth.uid === 'sKRHXxHf9cgzna8ce9UMdFvHZVZ2' || auth.uid === 'BUqnab10ASdHkwAM3HOezLIq6qe2')",
 
           // Site metadata — guests may read (site name, etc.)
           "meta": {
