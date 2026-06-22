@@ -15,6 +15,9 @@ build/
 pwa/node_modules/
 pwa/dist/
 
+# Cloud Functions
+functions/node_modules/
+
 # macOS
 .DS_Store
 

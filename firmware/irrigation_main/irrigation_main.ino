@@ -625,19 +625,26 @@ void setup() {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[WiFi] Starting AP mode for provisioning...");
-    WiFi.softAP(AP_SSID, AP_PASSWORD);
-    Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
-    inAPMode = true;
+    if (wifiSSID.length() == 0) {
+      // No credentials at all — this is a first boot, enter provisioning AP mode
+      Serial.println("[WiFi] No credentials found — starting AP mode for provisioning...");
+      WiFi.softAP(AP_SSID, AP_PASSWORD);
+      Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+      inAPMode = true;
 
-    server.on("/",     handleProvRoot);
-    server.on("/save", HTTP_POST, handleProvSave);
-    server.begin();
-    Serial.println("[WiFi] Provisioning server started — connect to ESP32_Config");
-    return;  // loop() will only serve provisioning until reboot
+      server.on("/",     handleProvRoot);
+      server.on("/save", HTTP_POST, handleProvSave);
+      server.begin();
+      Serial.println("[WiFi] Provisioning server started — connect to ESP32_Config");
+      return;  // loop() will only serve provisioning until reboot
+    }
+    // Credentials exist but router is unreachable (temporary outage).
+    // Do NOT enter AP mode — proceed to normal loop and let checkWifi() reconnect.
+    Serial.println("[WiFi] Connection failed but credentials exist — will retry in loop()");
   }
 
   Serial.printf("[WiFi] Connected, IP: %s\n", WiFi.localIP().toString().c_str());
+  wifiWasConnected = true;  // prevents false "wifi_reconnected" diagnostic on first checkWifi() tick
 
   // --- Firebase init ---
   fbConfig.api_key               = FIREBASE_API_KEY;
@@ -869,31 +876,19 @@ void checkWifi() {
 
   if (!connected) {
     if (wifiWasConnected) {
-      offlineStartMs = millis();  // start tracking offline duration
-      Serial.println("[WiFi] Connection lost — attempting reconnect...");
-    }
-    WiFi.disconnect();
-    WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
-
-    uint32_t startMs = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startMs < 15000) {
-      delay(500);
-      Serial.print(".");
-    }
-    Serial.println();
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.printf("[WiFi] Reconnected, IP: %s | RSSI: %d dBm\n",
-        WiFi.localIP().toString().c_str(), WiFi.RSSI());
-      wifiWasConnected = true;
-      publishDiagnostic("wifi_reconnected");
-    } else {
-      Serial.printf("[WiFi] Reconnect failed (status %d) — will retry\n", WiFi.status());
+      offlineStartMs = millis();
+      Serial.println("[WiFi] Connection lost — kicking reconnect (non-blocking)");
       wifiWasConnected = false;
     }
+    // Non-blocking: kick WiFi.begin() and return immediately.
+    // enforceValveSafety() continues to run between retries.
+    // Status is checked on the next checkWifi() tick (30s later).
+    WiFi.disconnect(true);
+    WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+    Serial.printf("[WiFi] Reconnect attempt started — status will be checked next tick\n");
   } else {
     if (!wifiWasConnected) {
-      Serial.printf("[WiFi] Connected, IP: %s | RSSI: %d dBm\n",
+      Serial.printf("[WiFi] Reconnected, IP: %s | RSSI: %d dBm\n",
         WiFi.localIP().toString().c_str(), WiFi.RSSI());
       publishDiagnostic("wifi_reconnected");
     }
